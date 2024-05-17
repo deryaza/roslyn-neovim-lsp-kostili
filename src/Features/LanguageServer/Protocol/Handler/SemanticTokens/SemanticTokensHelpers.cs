@@ -27,9 +27,10 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
             SemanticTokensRefreshQueue semanticTokensRefreshQueue,
             LSP.Range[] ranges,
             RequestContext context,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool allowEmptyRange = false)
         {
-            if (ranges.Length == 0)
+            if (ranges.Length == 0 && !allowEmptyRange)
             {
                 return [];
             }

@@ -94,7 +94,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer
             // potentially run a diff between the old and new tokens.
             capabilities.SemanticTokensOptions = new SemanticTokensOptions
             {
-                Full = false,
+                Full = true,
                 Range = true,
                 Legend = new SemanticTokensLegend
                 {
