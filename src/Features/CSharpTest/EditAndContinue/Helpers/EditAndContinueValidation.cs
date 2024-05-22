@@ -2,9 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Differencing;
 using Microsoft.CodeAnalysis.EditAndContinue;
 using Microsoft.CodeAnalysis.Contracts.EditAndContinue;
@@ -110,6 +107,18 @@ namespace Microsoft.CodeAnalysis.CSharp.EditAndContinue.UnitTests
             params SemanticEditDescription[] semanticEdits)
         {
             VerifySemantics(editScript, ActiveStatementsDescription.Empty, semanticEdits, capabilities: null);
+        }
+
+        internal static void VerifySemantics(
+            this EditScript<SyntaxNode> editScript,
+            SemanticEditDescription[] semanticEdits,
+            RudeEditDiagnosticDescription[] warnings,
+            EditAndContinueCapabilities? capabilities = null)
+        {
+            VerifySemantics(
+                [editScript],
+                [new DocumentAnalysisResultsDescription(ActiveStatementsDescription.Empty, semanticEdits: semanticEdits, diagnostics: warnings)],
+                capabilities: capabilities);
         }
 
         internal static void VerifySemantics(
