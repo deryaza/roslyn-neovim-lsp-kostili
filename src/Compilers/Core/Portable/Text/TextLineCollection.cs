@@ -64,7 +64,9 @@ namespace Microsoft.CodeAnalysis.Text
         {
             if (position.Line >= this.Count)
             {
-                throw new ArgumentOutOfRangeException(nameof(position.Line), string.Format(CodeAnalysisResources.LineCannotBeGreaterThanEnd, position.Line, this.Count));
+                // maybe it's neovim's fault, but this situation is probably recoverable???
+                // throw new ArgumentOutOfRangeException(nameof(position.Line), string.Format(CodeAnalysisResources.LineCannotBeGreaterThanEnd, position.Line, this.Count));
+                return this[Count - 1].End;
             }
 
             return this[position.Line].Start + position.Character;
