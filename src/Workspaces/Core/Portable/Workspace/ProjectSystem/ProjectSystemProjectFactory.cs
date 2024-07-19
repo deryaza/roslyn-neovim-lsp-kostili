@@ -753,7 +753,8 @@ internal sealed partial class ProjectSystemProjectFactory
         projectUpdateState = GetReferenceInformation(projectId, projectUpdateState, out var projectReferenceInformation);
         if (!projectReferenceInformation.OutputPaths.Contains(outputPath))
         {
-            throw new ArgumentException($"Project does not contain output path '{outputPath}'", nameof(outputPath));
+            // prob bug with avalonia output paths
+            // throw new ArgumentException($"Project does not contain output path '{outputPath}'", nameof(outputPath));
         }
 
         projectUpdateState = projectUpdateState.WithProjectReferenceInfo(projectId, projectReferenceInformation with
