@@ -24,7 +24,8 @@ internal static class NamingStyleOptions
     internal static PerLanguageOption2<NamingStylePreferences> NamingPreferences { get; } = new(
         NamingPreferencesOptionName,
         defaultValue: NamingStylePreferences.Default,
-        isEditorConfigOption: true);
+        isEditorConfigOption: true,
+        serializer: EditorConfigValueSerializer<NamingStylePreferences>.Unsupported);
 }
 
 internal interface NamingStylePreferencesProvider
@@ -33,14 +34,3 @@ internal interface NamingStylePreferencesProvider
 #endif
 {
 }
-
-#if !CODE_STYLE
-internal static class NamingStylePreferencesProviders
-{
-    public static async ValueTask<NamingStylePreferences> GetNamingStylePreferencesAsync(this Document document, CancellationToken cancellationToken)
-    {
-        var configOptions = await document.GetAnalyzerConfigOptionsAsync(cancellationToken).ConfigureAwait(false);
-        return configOptions.GetEditorConfigOption(NamingStyleOptions.NamingPreferences, NamingStylePreferences.Default);
-    }
-}
-#endif

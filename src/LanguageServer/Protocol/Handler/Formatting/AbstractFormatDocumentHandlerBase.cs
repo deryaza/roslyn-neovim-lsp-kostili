@@ -41,10 +41,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler
 
             var services = document.Project.Solution.Services;
             var textChanges = Formatter.GetFormattedTextChanges(root, [formattingSpan], services, formattingOptions, rules: default, cancellationToken);
-
-            var edits = new ArrayBuilder<LSP.TextEdit>();
-            edits.AddRange(textChanges.Select(change => ProtocolConversions.TextChangeToTextEdit(change, text)));
-            return edits.ToArrayAndFree();
+            return [.. textChanges.Select(change => ProtocolConversions.TextChangeToTextEdit(change, text))];
         }
 
         public abstract LSP.TextDocumentIdentifier GetTextDocumentIdentifier(RequestType request);

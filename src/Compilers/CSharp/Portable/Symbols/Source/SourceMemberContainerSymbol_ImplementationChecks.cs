@@ -114,7 +114,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             var forwardingMethods = ArrayBuilder<SynthesizedExplicitImplementationForwardingMethod>.GetInstance();
             var methodImpls = ArrayBuilder<(MethodSymbol Body, MethodSymbol Implemented)>.GetInstance();
 
-            // NOTE: We can't iterator over this collection directly, since it is not ordered.  Instead we
+            // NOTE: We can't iterate over this collection directly, since it is not ordered.  Instead we
             // iterate over AllInterfaces and filter out the interfaces that are not in this set.  This is
             // preferable to doing the DFS ourselves because both AllInterfaces and
             // InterfacesAndTheirBaseInterfaces are cached and used in multiple places.
@@ -1149,25 +1149,22 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 MethodSymbol overridingMethod,
                 BindingDiagnosticBag diagnostics)
             {
-                if (RequiresValidScopedOverrideForRefSafety(overriddenMethod))
-                {
-                    CheckValidScopedOverride(
-                        overriddenMethod,
-                        overridingMethod,
-                        diagnostics,
-                        static (diagnostics, overriddenMethod, overridingMethod, overridingParameter, _, location) =>
-                            {
-                                diagnostics.Add(
-                                    ReportInvalidScopedOverrideAsError(overriddenMethod, overridingMethod) ?
-                                        ErrorCode.ERR_ScopedMismatchInParameterOfOverrideOrImplementation :
-                                        ErrorCode.WRN_ScopedMismatchInParameterOfOverrideOrImplementation,
-                                    location,
-                                    new FormattedSymbol(overridingParameter, SymbolDisplayFormat.ShortFormat));
-                            },
-                        overridingMemberLocation,
-                        allowVariance: true,
-                        invokedAsExtensionMethod: false);
-                }
+                CheckValidScopedOverride(
+                    overriddenMethod,
+                    overridingMethod,
+                    diagnostics,
+                    static (diagnostics, overriddenMethod, overridingMethod, overridingParameter, _, location) =>
+                        {
+                            diagnostics.Add(
+                                ReportInvalidScopedOverrideAsError(overriddenMethod, overridingMethod) ?
+                                    ErrorCode.ERR_ScopedMismatchInParameterOfOverrideOrImplementation :
+                                    ErrorCode.WRN_ScopedMismatchInParameterOfOverrideOrImplementation,
+                                location,
+                                new FormattedSymbol(overridingParameter, SymbolDisplayFormat.ShortFormat));
+                        },
+                    overridingMemberLocation,
+                    allowVariance: true,
+                    invokedAsExtensionMethod: false);
 
                 CheckValidNullableMethodOverride(overridingMethod.DeclaringCompilation, overriddenMethod, overridingMethod, diagnostics,
                                                  ReportBadReturn,
@@ -1370,60 +1367,55 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
 #nullable enable
         /// <summary>
-        /// Returns true if the method signature must match, with respect to scoped for ref safety,
-        /// in overrides, interface implementations, or delegate conversions.
-        /// </summary>
-        internal static bool RequiresValidScopedOverrideForRefSafety(MethodSymbol? method)
-        {
-            if (method is null)
-            {
-                return false;
-            }
-
-            var parameters = method.Parameters;
-
-            // https://github.com/dotnet/csharplang/blob/main/proposals/csharp-11.0/low-level-struct-improvements.md#scoped-mismatch
-            // The compiler will report a diagnostic for _unsafe scoped mismatches_ across overrides, interface implementations, and delegate conversions when:
-            // - The method returns a `ref struct` or returns a `ref` or `ref readonly`, or the method has a `ref` or `out` parameter of `ref struct` type, and
-            // ...
-            int nRefParametersRequired;
-            if (method.ReturnType.IsRefLikeOrAllowsRefLikeType() ||
-                (method.RefKind is RefKind.Ref or RefKind.RefReadOnly))
-            {
-                nRefParametersRequired = 1;
-            }
-            else if (parameters.Any(p => (p.RefKind is RefKind.Ref or RefKind.Out) && p.Type.IsRefLikeOrAllowsRefLikeType()))
-            {
-                nRefParametersRequired = 2; // including the parameter found above
-            }
-            else
-            {
-                return false;
-            }
-
-            // ...
-            // - The method has at least one additional `ref`, `in`, `ref readonly`, or `out` parameter, or a parameter of `ref struct` type.
-            int nRefParameters = parameters.Count(p => p.RefKind is RefKind.Ref or RefKind.In or RefKind.RefReadOnlyParameter or RefKind.Out);
-            if (nRefParameters >= nRefParametersRequired)
-            {
-                return true;
-            }
-            else if (parameters.Any(p => p.RefKind == RefKind.None && p.Type.IsRefLikeOrAllowsRefLikeType()))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        /// <summary>
         /// Returns true if a scoped mismatch should be reported as an error rather than a warning.
         /// </summary>
         internal static bool ReportInvalidScopedOverrideAsError(MethodSymbol baseMethod, MethodSymbol overrideMethod)
         {
             // https://github.com/dotnet/csharplang/blob/main/proposals/csharp-11.0/low-level-struct-improvements.md#scoped-mismatch
             // The diagnostic is reported as an error if the mismatched signatures are both using C#11 ref safety rules; otherwise, the diagnostic is a warning.
-            return baseMethod.UseUpdatedEscapeRules && overrideMethod.UseUpdatedEscapeRules;
+            return baseMethod.UseUpdatedEscapeRules && overrideMethod.UseUpdatedEscapeRules &&
+                // We have removed exceptions to the scoped mismatch error reporting, but to avoid breaks
+                // we report the new scenarios (previously exempted) as warnings in C# 12 and earlier.
+                // https://github.com/dotnet/roslyn/issues/76100
+                (overrideMethod.DeclaringCompilation.LanguageVersion > LanguageVersion.CSharp12 || usedToBeReported(baseMethod));
+
+            static bool usedToBeReported(MethodSymbol method)
+            {
+                var parameters = method.Parameters;
+
+                // https://github.com/dotnet/csharplang/blob/1f7f23f/proposals/csharp-11.0/low-level-struct-improvements.md#scoped-mismatch
+                // The compiler will report a diagnostic for _unsafe scoped mismatches_ across overrides, interface implementations, and delegate conversions when:
+                // - The method returns a `ref struct` or returns a `ref` or `ref readonly`, or the method has a `ref` or `out` parameter of `ref struct` type, and
+                // ...
+                int nRefParametersRequired;
+                if (method.ReturnType.IsRefLikeOrAllowsRefLikeType() ||
+                    (method.RefKind is RefKind.Ref or RefKind.RefReadOnly))
+                {
+                    nRefParametersRequired = 1;
+                }
+                else if (parameters.Any(p => (p.RefKind is RefKind.Ref or RefKind.Out) && p.Type.IsRefLikeOrAllowsRefLikeType()))
+                {
+                    nRefParametersRequired = 2; // including the parameter found above
+                }
+                else
+                {
+                    return false;
+                }
+
+                // ...
+                // - The method has at least one additional `ref`, `in`, `ref readonly`, or `out` parameter, or a parameter of `ref struct` type.
+                int nRefParameters = parameters.Count(p => p.RefKind is RefKind.Ref or RefKind.In or RefKind.RefReadOnlyParameter or RefKind.Out);
+                if (nRefParameters >= nRefParametersRequired)
+                {
+                    return true;
+                }
+                else if (parameters.Any(p => p.RefKind == RefKind.None && p.Type.IsRefLikeOrAllowsRefLikeType()))
+                {
+                    return true;
+                }
+
+                return false;
+            }
         }
 
         /// <summary>
@@ -1838,7 +1830,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                             needSynthesizedImplementation = false;
                         }
                     }
-                    else if (implementingMethod.IsMetadataVirtual(ignoreInterfaceImplementationChanges: true))
+                    else if (implementingMethod.IsMetadataVirtual(MethodSymbol.IsMetadataVirtualOption.IgnoreInterfaceImplementationChanges))
                     {
                         // If the signatures match and the implementation method is definitely virtual, then we're set.
                         needSynthesizedImplementation = false;

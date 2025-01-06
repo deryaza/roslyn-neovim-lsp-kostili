@@ -13,15 +13,18 @@ using Microsoft.CodeAnalysis.AddImport;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CodeStyle;
+using Microsoft.CodeAnalysis.CSharp.Simplification;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.LanguageService;
+using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Simplification;
 using Roslyn.Utilities;
+using Microsoft.CodeAnalysis.CSharp.CodeStyle;
 
 namespace Microsoft.CodeAnalysis.CSharp.MisplacedUsingDirectives;
 
@@ -57,12 +60,12 @@ internal sealed partial class MisplacedUsingDirectivesCodeFixProvider() : CodeFi
         var syntaxRoot = await document.GetRequiredSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
         var compilationUnit = (CompilationUnitSyntax)syntaxRoot;
 
-        var options = await document.GetCSharpCodeFixOptionsProviderAsync(cancellationToken).ConfigureAwait(false);
-        var simplifierOptions = options.GetSimplifierOptions();
+        var configOptions = await document.GetHostAnalyzerConfigOptionsAsync(cancellationToken).ConfigureAwait(false);
+        var simplifierOptions = new CSharpSimplifierOptions(configOptions);
 
         // Read the preferred placement option and verify if it can be applied to this code file. There are cases
         // where we will not be able to fix the diagnostic and the user will need to resolve it manually.
-        var (placement, preferPreservation) = DeterminePlacement(compilationUnit, options.UsingDirectivePlacement);
+        var (placement, preferPreservation) = DeterminePlacement(compilationUnit, configOptions.GetOption(CSharpCodeStyleOptions.PreferredUsingDirectivePlacement));
         if (preferPreservation)
             return;
 
@@ -224,7 +227,7 @@ internal sealed partial class MisplacedUsingDirectivesCodeFixProvider() : CodeFi
         var usingsToAdd = namespaceDeclarationMap.Values.SelectMany(result => result.usingsFromNamespace)
             .Select(directive => directive.WithAdditionalAnnotations(Formatter.Annotation, s_warningAnnotation));
 
-        var (deduplicatedUsings, orphanedTrivia) = RemoveDuplicateUsings(compilationUnit.Usings, usingsToAdd.ToImmutableArray());
+        var (deduplicatedUsings, orphanedTrivia) = RemoveDuplicateUsings(compilationUnit.Usings, [.. usingsToAdd]);
 
         // Update the compilation unit with the usings from the namespace declaration.
         var newUsings = compilationUnitWithReplacedNamespaces.Usings.AddRange(deduplicatedUsings);

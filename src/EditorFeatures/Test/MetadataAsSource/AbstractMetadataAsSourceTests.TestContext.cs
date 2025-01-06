@@ -289,7 +289,7 @@ public abstract partial class AbstractMetadataAsSourceTests
             // We construct our own composition here because we only want the decompilation metadata as source provider
             // to be available.
             var composition = EditorTestCompositions.EditorFeatures
-                .WithExcludedPartTypes(ImmutableHashSet.Create(typeof(IMetadataAsSourceFileProvider)))
+                .WithExcludedPartTypes([typeof(IMetadataAsSourceFileProvider)])
                 .AddParts(typeof(DecompilationMetadataAsSourceFileProvider));
 
             return TestWorkspace.Create(xmlString, composition: composition);
@@ -300,7 +300,7 @@ public abstract partial class AbstractMetadataAsSourceTests
             using var reader = File.OpenRead(file.FilePath);
             var stringText = EncodedStringText.Create(reader);
 
-            Assert.True(_metadataAsSourceService.TryAddDocumentToWorkspace(file.FilePath, stringText.Container));
+            Assert.True(_metadataAsSourceService.TryAddDocumentToWorkspace(file.FilePath, stringText.Container, out var _));
 
             return stringText.Container.GetRelatedDocuments().Single();
         }

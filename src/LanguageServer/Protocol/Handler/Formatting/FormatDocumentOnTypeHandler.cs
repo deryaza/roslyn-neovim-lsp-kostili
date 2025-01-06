@@ -72,9 +72,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler
                 return [];
             }
 
-            var edits = new ArrayBuilder<TextEdit>();
-            edits.AddRange(textChanges.Select(change => ProtocolConversions.TextChangeToTextEdit(change, documentSyntax.Text)));
-            return edits.ToArrayAndFree();
+            return [.. textChanges.Select(change => ProtocolConversions.TextChangeToTextEdit(change, documentSyntax.Text))];
         }
     }
 }

@@ -69,18 +69,18 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler
 
                 sigInfo.Label = GetSignatureText(item);
                 sigInfo.Documentation = new LSP.MarkupContent { Kind = LSP.MarkupKind.PlainText, Value = item.DocumentationFactory(cancellationToken).GetFullText() };
-                sigInfo.Parameters = item.Parameters.Select(p => new LSP.ParameterInformation
+                sigInfo.Parameters = [.. item.Parameters.Select(p => new LSP.ParameterInformation
                 {
                     Label = p.Name,
                     Documentation = new LSP.MarkupContent { Kind = LSP.MarkupKind.PlainText, Value = p.DocumentationFactory(cancellationToken).GetFullText() }
-                }).ToArray();
+                })];
                 sigInfos.Add(sigInfo);
             }
 
             var sigHelp = new LSP.SignatureHelp
             {
                 ActiveSignature = GetActiveSignature(sigItems),
-                ActiveParameter = sigItems.ArgumentIndex,
+                ActiveParameter = sigItems.SemanticParameterIndex,
                 Signatures = sigInfos.ToArray()
             };
 
@@ -100,7 +100,8 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler
             // However, the LSP spec expects the language server to make this decision.
             // So implement the logic of picking a signature that has enough arguments here.
 
-            var matchingSignature = items.Items.FirstOrDefault(sig => sig.Parameters.Length > items.ArgumentIndex);
+            var matchingSignature = items.Items.FirstOrDefault(
+                sig => sig.Parameters.Length > items.SemanticParameterIndex);
             return matchingSignature != null ? items.Items.IndexOf(matchingSignature) : 0;
         }
 
@@ -135,9 +136,10 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler
 
             return sb.ToString();
         }
+
         private static ClassifiedTextElement GetSignatureClassifiedText(SignatureHelpItem item)
         {
-            var taggedTexts = new ArrayBuilder<TaggedText>();
+            using var _ = ArrayBuilder<TaggedText>.GetInstance(out var taggedTexts);
 
             taggedTexts.AddRange(item.PrefixDisplayParts);
 
@@ -159,7 +161,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer.Handler
             taggedTexts.AddRange(item.SuffixDisplayParts);
             taggedTexts.AddRange(item.DescriptionParts);
 
-            return new ClassifiedTextElement(taggedTexts.ToArrayAndFree().Select(part => new ClassifiedTextRun(part.Tag.ToClassificationTypeName(), part.Text)));
+            return new ClassifiedTextElement(taggedTexts.ToArray().Select(part => new ClassifiedTextRun(part.Tag.ToClassificationTypeName(), part.Text)));
         }
     }
 }
