@@ -119,7 +119,7 @@ namespace Microsoft.CodeAnalysis.LanguageServer
             // Using VS server capabilities because we have our own custom client.
             capabilities.OnAutoInsertProvider = new VSInternalDocumentOnAutoInsertOptions { TriggerCharacters = ["'", "/", "\n"] };
 
-            capabilities.DiagnosticOptions = new() { InterFileDependencies = true, WorkspaceDiagnostics = true };
+            capabilities.DiagnosticOptions = new(new DiagnosticRegistrationOptions() { InterFileDependencies = true, WorkspaceDiagnostics = true });
             return capabilities;
         }
 
