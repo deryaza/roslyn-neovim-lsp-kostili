@@ -135,6 +135,8 @@ internal sealed class ExperimentalCapabilitiesProvider : ICapabilitiesProvider
         // Using VS server capabilities because we have our own custom client.
         capabilities.OnAutoInsertProvider = new VSInternalDocumentOnAutoInsertOptions { TriggerCharacters = ["'", "/", "\n"] };
 
+        // so neovim starts automatically issue diagnostic requests
+        capabilities.DiagnosticOptions = new(new DiagnosticRegistrationOptions() { InterFileDependencies = true, WorkspaceDiagnostics = true });
         return capabilities;
     }
 
