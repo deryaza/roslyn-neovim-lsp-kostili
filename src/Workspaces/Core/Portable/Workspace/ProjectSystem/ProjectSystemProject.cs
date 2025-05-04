@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.ErrorReporting;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.PooledObjects;
@@ -22,6 +23,7 @@ using Microsoft.CodeAnalysis.Shared.Collections;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Telemetry;
 using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.Threading;
 using Roslyn.Utilities;
 using static Microsoft.CodeAnalysis.Workspaces.ProjectSystem.ProjectSystemProjectFactory;
 
@@ -29,7 +31,6 @@ namespace Microsoft.CodeAnalysis.Workspaces.ProjectSystem;
 
 internal sealed partial class ProjectSystemProject
 {
-    private static readonly char[] s_directorySeparator = [Path.DirectorySeparatorChar];
     private static readonly ImmutableArray<MetadataReferenceProperties> s_defaultMetadataReferenceProperties = [default(MetadataReferenceProperties)];
 
     private readonly ProjectSystemProjectFactory _projectSystemProjectFactory;
@@ -262,6 +263,9 @@ internal sealed partial class ProjectSystemProject
 
             field = newValue;
 
+            _projectPropertyModificationsInBatch.Add(
+                (solutionChanges, projectUpdateState) => updateSolution(solutionChanges, projectUpdateState, oldValue));
+
             if (logThrowAwayTelemetry)
             {
                 var telemetryService = _projectSystemProjectFactory.SolutionServices.GetService<IWorkspaceTelemetryService>();
@@ -282,13 +286,29 @@ internal sealed partial class ProjectSystemProject
 
                     if (!isFullyLoaded)
                     {
-                        TryReportCompilationThrownAway(_projectSystemProjectFactory.Workspace.CurrentSolution, Id);
+                        if (ShouldReportCompilationWillBeThrownAway(newValue, oldValue))
+                            TryReportCompilationThrownAway(_projectSystemProjectFactory.Workspace.CurrentSolution, Id);
                     }
                 }
             }
+        }
 
-            _projectPropertyModificationsInBatch.Add(
-                (solutionChanges, projectUpdateState) => updateSolution(solutionChanges, projectUpdateState, oldValue));
+        bool ShouldReportCompilationWillBeThrownAway(T newValue, T? oldValue)
+        {
+            // This method can be called for both AssemblyName (type string) and ParseOptions (type ParseOptions) changes.
+
+            // We report telemetry for AssemblyName changes.
+            if (newValue is not ParseOptions newParseOption)
+                return true;
+
+            // We don't want to report telemetry for the initial evaluation result.
+            if (oldValue is not ParseOptions oldParseOptions)
+                return false;
+
+            // ParseOptions should be reported if they differ by more than just preprocessor directives. (See DocumentState.UpdateParseOptionsAndSourceCodeKind)
+            var syntaxTreeFactoryService = _projectSystemProjectFactory.SolutionServices.GetRequiredLanguageService<ISyntaxTreeFactoryService>(Language);
+
+            return !syntaxTreeFactoryService.OptionsDifferOnlyByPreprocessorDirectives(oldParseOptions, newParseOption);
         }
     }
 
@@ -359,7 +379,7 @@ internal sealed partial class ProjectSystemProject
     public CompilationOptions? CompilationOptions
     {
         get => _compilationOptions;
-        set => ChangeProjectProperty(ref _compilationOptions, value, s => s.WithProjectCompilationOptions(Id, value), logThrowAwayTelemetry: true);
+        set => ChangeProjectProperty(ref _compilationOptions, value, s => s.WithProjectCompilationOptions(Id, value));
     }
 
     // The property could be null if this is a non-C#/VB language and we don't have one for it. But we disallow assigning null, because C#/VB cannot end up null
@@ -651,7 +671,7 @@ internal sealed partial class ProjectSystemProject
                 await _projectSystemProjectFactory.ApplyChangeToWorkspaceMaybeAsync(useAsync, w => w.OnAnalyzerConfigDocumentOpened(documentId, textContainer)).ConfigureAwait(false);
 
             // Give the host the opportunity to check if those files are open
-            if (documentFileNamesAdded.Count() > 0)
+            if (documentFileNamesAdded.Length > 0)
                 await _projectSystemProjectFactory.RaiseOnDocumentsAddedMaybeAsync(useAsync, documentFileNamesAdded).ConfigureAwait(false);
 
             // If we added or removed analyzers, then re-run all generators to bring them up to date.
@@ -667,6 +687,8 @@ internal sealed partial class ProjectSystemProject
             List<(string path, MetadataReferenceProperties properties)> metadataReferencesAddedInBatch)
         {
             var projectId = projectBeforeMutation.Id;
+            using var _1 = ArrayBuilder<PortableExecutableReference>.GetInstance(out var peReferencesRemoved);
+            using var _2 = ArrayBuilder<PortableExecutableReference>.GetInstance(out var peReferencesAdded);
 
             // Metadata reference removing. Do this before adding in case this removes a project reference that we are also
             // going to add in the same batch. This could happen if case is changing, or we're targeting a different output
@@ -686,12 +708,15 @@ internal sealed partial class ProjectSystemProject
                         .OfType<PortableExecutableReference>()
                         .Single(m => m.FilePath == path && m.Properties == properties);
 
-                    projectUpdateState = projectUpdateState.WithIncrementalMetadataReferenceRemoved(metadataReference);
+                    peReferencesRemoved.Add(metadataReference);
 
                     solutionChanges.UpdateSolutionForProjectAction(
                         projectId, solutionChanges.Solution.RemoveMetadataReference(projectId, metadataReference));
                 }
             }
+
+            if (peReferencesRemoved.Count > 0)
+                projectUpdateState = projectUpdateState.WithIncrementalMetadataReferencesRemoved(peReferencesRemoved);
 
             // Metadata reference adding...
             if (metadataReferencesAddedInBatch.Count > 0)
@@ -710,9 +735,12 @@ internal sealed partial class ProjectSystemProject
                     else
                     {
                         var metadataReference = CreateMetadataReference_NoLock(path, properties, solutionChanges.Solution.Services);
-                        projectUpdateState = projectUpdateState.WithIncrementalMetadataReferenceAdded(metadataReference);
+                        peReferencesAdded.Add(metadataReference);
                     }
                 }
+
+                if (peReferencesAdded.Count > 0)
+                    projectUpdateState = projectUpdateState.WithIncrementalMetadataReferencesAdded(peReferencesAdded);
 
                 solutionChanges.UpdateSolutionForProjectAction(
                     projectId,
@@ -1126,7 +1154,41 @@ internal sealed partial class ProjectSystemProject
             return GetMappedRazorSourceGenerator(fullPath);
         }
 
+        if (TryRedirectAnalyzerAssembly(fullPath) is { } redirectedPath)
+        {
+            return OneOrMany.Create(redirectedPath);
+        }
+
         return OneOrMany.Create(fullPath);
+    }
+
+    private string? TryRedirectAnalyzerAssembly(string fullPath)
+    {
+        string? redirectedPath = null;
+
+        foreach (var redirector in _hostInfo.AnalyzerAssemblyRedirectors)
+        {
+            try
+            {
+                if (redirector.RedirectPath(fullPath) is { } currentlyRedirectedPath)
+                {
+                    if (redirectedPath == null)
+                    {
+                        redirectedPath = currentlyRedirectedPath;
+                    }
+                    else if (redirectedPath != currentlyRedirectedPath)
+                    {
+                        throw new InvalidOperationException($"Multiple redirectors disagree on the path to redirect '{fullPath}' to ('{redirectedPath}' vs '{currentlyRedirectedPath}').");
+                    }
+                }
+            }
+            catch (Exception ex) when (FatalError.ReportAndCatch(ex, ErrorSeverity.General))
+            {
+                // Ignore if the external redirector throws.
+            }
+        }
+
+        return redirectedPath;
     }
 
     private static readonly string s_csharpCodeStyleAnalyzerSdkDirectory = CreateDirectoryPathFragment("Sdks", "Microsoft.NET.Sdk", "codestyle", "cs");
@@ -1154,9 +1216,9 @@ internal sealed partial class ProjectSystemProject
 
     private OneOrMany<string> GetMappedRazorSourceGenerator(string fullPath)
     {
-        var vsixRazorAnalyzers = _hostInfo.HostDiagnosticAnalyzerProvider.GetAnalyzerReferencesInExtensions().SelectAsArray(
+        var vsixRazorAnalyzers = _hostInfo.HostDiagnosticAnalyzerProvider.GetRazorAssembliesInExtensions().SelectAsArray(
             predicate: item => item.extensionId == RazorVsixExtensionId,
-            selector: item => item.reference.FullPath);
+            selector: item => item.path);
 
         if (!vsixRazorAnalyzers.IsEmpty)
         {

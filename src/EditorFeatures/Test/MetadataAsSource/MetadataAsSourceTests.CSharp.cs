@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.UnitTests.MetadataAsSource;
 
-public partial class MetadataAsSourceTests
+public sealed partial class MetadataAsSourceTests
 {
     [Trait(Traits.Feature, Traits.Features.MetadataAsSource)]
     public class CSharp : AbstractMetadataAsSourceTests
@@ -778,6 +778,51 @@ public partial class MetadataAsSourceTests
             };
 
             await GenerateAndVerifySourceAsync(metadataSource, symbolName, LanguageNames.CSharp, languageVersion: "Preview", metadataLanguageVersion: "Preview", expected: expected, signaturesOnly: signaturesOnly);
+        }
+
+        [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/76676")]
+        public async Task TestParamsScoped()
+        {
+            var metadataSource = """
+                public class C
+                {
+                    public void M(params scoped System.ReadOnlySpan<string> x) { }
+                }
+
+                namespace System
+                {
+                    public readonly ref struct ReadOnlySpan<T>
+                    {
+                    }
+                }
+                """;
+
+            var symbolName = "C";
+
+            var expected = $$"""
+                #region {{FeaturesResources.Assembly}} ReferencedAssembly, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+                // {{CodeAnalysisResources.InMemoryAssembly}}
+                #endregion
+
+                using System;
+
+                public class [|C|]
+                {
+                    public C();
+
+                    public void M(params scoped ReadOnlySpan<string> x);
+                }
+                """;
+
+            await GenerateAndVerifySourceAsync(
+                metadataSource,
+                symbolName,
+                LanguageNames.CSharp,
+                languageVersion: "Preview",
+                metadataLanguageVersion: "Preview",
+                expected: expected,
+                signaturesOnly: true,
+                commonReferencesValue: """CommonReferencesNet9="true" """);
         }
     }
 }

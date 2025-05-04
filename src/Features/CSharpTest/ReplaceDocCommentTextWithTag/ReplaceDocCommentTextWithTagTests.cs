@@ -13,7 +13,7 @@ using Xunit;
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ReplaceDocCommentTextWithTag;
 
 [Trait(Traits.Feature, Traits.Features.CodeActionsReplaceDocCommentTextWithTag)]
-public class ReplaceDocCommentTextWithTagTests : AbstractCSharpCodeActionTest_NoEditor
+public sealed class ReplaceDocCommentTextWithTagTests : AbstractCSharpCodeActionTest_NoEditor
 {
     protected override CodeRefactoringProvider CreateCodeRefactoringProvider(TestWorkspace workspace, TestParameters parameters)
         => new CSharpReplaceDocCommentTextWithTagCodeRefactoringProvider();
@@ -69,6 +69,44 @@ public class ReplaceDocCommentTextWithTagTests : AbstractCSharpCodeActionTest_No
 
             """
             /// Testing keyword <see langword="static"/>
+            class C<TKey>
+            {
+            }
+            """);
+    }
+
+    [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/76548")]
+    public async Task TestEndOfKeyword_XmlCloseTagFollowing()
+    {
+        await TestInRegularAndScriptAsync(
+            """
+            /// <summary>Testing keyword null[||]</summary>
+            class C<TKey>
+            {
+            }
+            """,
+
+            """
+            /// <summary>Testing keyword <see langword="null"/></summary>
+            class C<TKey>
+            {
+            }
+            """);
+    }
+
+    [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/76548")]
+    public async Task TestEndOfKeyword_XmlOpenTagPreceding()
+    {
+        await TestInRegularAndScriptAsync(
+            """
+            /// <summary>[||]null is an option.</summary>
+            class C<TKey>
+            {
+            }
+            """,
+
+            """
+            /// <summary><see langword="null"/> is an option.</summary>
             class C<TKey>
             {
             }

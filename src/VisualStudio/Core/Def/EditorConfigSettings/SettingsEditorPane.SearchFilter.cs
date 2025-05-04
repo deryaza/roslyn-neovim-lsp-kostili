@@ -12,7 +12,7 @@ namespace Microsoft.VisualStudio.LanguageServices.EditorConfigSettings;
 
 internal sealed partial class SettingsEditorPane
 {
-    internal class SearchFilter : IEntryFilter
+    internal sealed class SearchFilter : IEntryFilter
     {
         private readonly IEnumerable<IVsSearchToken> _searchTokens;
         private readonly IReadOnlyList<ITableColumnDefinition>? _visibleColumns;
@@ -20,7 +20,7 @@ internal sealed partial class SettingsEditorPane
         public SearchFilter(IVsSearchQuery searchQuery, IWpfTableControl control)
         {
             _searchTokens = SearchUtilities.ExtractSearchTokens(searchQuery);
-            _searchTokens ??= Array.Empty<IVsSearchToken>();
+            _searchTokens ??= [];
 
             var newVisibleColumns = new List<ITableColumnDefinition>();
             foreach (var c in control.ColumnStates)

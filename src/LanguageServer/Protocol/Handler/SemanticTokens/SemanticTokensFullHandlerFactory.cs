@@ -7,25 +7,18 @@ using System.Composition;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Options;
 
-namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens
+namespace Microsoft.CodeAnalysis.LanguageServer.Handler.SemanticTokens;
+
+[ExportCSharpVisualBasicLspServiceFactory(typeof(SemanticTokensFullHandler)), Shared]
+[method: ImportingConstructor]
+[method: Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
+internal sealed class SemanticTokensFullHandlerFactory(IGlobalOptionService globalOptions) : ILspServiceFactory
 {
-    [ExportCSharpVisualBasicLspServiceFactory(typeof(SemanticTokensFullHandler)), Shared]
-    internal sealed class SemanticTokensFullHandlerFactory : ILspServiceFactory
+    private readonly IGlobalOptionService _globalOptions = globalOptions;
+
+    public ILspService CreateILspService(LspServices lspServices, WellKnownLspServerKinds serverKind)
     {
-        private readonly IGlobalOptionService _globalOptions;
-
-        [ImportingConstructor]
-        [Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
-        public SemanticTokensFullHandlerFactory(
-            IGlobalOptionService globalOptions)
-        {
-            _globalOptions = globalOptions;
-        }
-
-        public ILspService CreateILspService(LspServices lspServices, WellKnownLspServerKinds serverKind)
-        {
-            var semanticTokensRefreshQueue = lspServices.GetRequiredService<SemanticTokensRefreshQueue>();
-            return new SemanticTokensFullHandler(_globalOptions, semanticTokensRefreshQueue);
-        }
+        var semanticTokensRefreshQueue = lspServices.GetRequiredService<SemanticTokensRefreshQueue>();
+        return new SemanticTokensFullHandler(_globalOptions, semanticTokensRefreshQueue);
     }
 }

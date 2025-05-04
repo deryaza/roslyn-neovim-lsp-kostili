@@ -7,12 +7,14 @@
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.EditAndContinue.UnitTests;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.CSharp.EditAndContinue.UnitTests;
 
-public class StatementMatchingTests : EditingTestBase
+[UseExportProvider]
+public sealed class StatementMatchingTests : EditingTestBase
 {
     #region Known Matches
 

@@ -9,6 +9,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.CodeAnalysis.CSharp.Emit;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -74,7 +75,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
 #nullable enable
         private SynthesizedBackingFieldSymbol? _lazyDeclaredBackingField;
-        private SynthesizedBackingFieldSymbol? _lazyMergedBackingField;
+        private StrongBox<SynthesizedBackingFieldSymbol?>? _lazyMergedBackingField;
 
         protected SourcePropertySymbolBase(
             SourceMemberContainerTypeSymbol containingType,
@@ -469,7 +470,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                     // always use the real attribute bag of this symbol and modify LoadAndValidateAttributes to
                     // handle partially filled bags.
                     CustomAttributesBag<CSharpAttributeData>? temp = null;
-                    LoadAndValidateAttributes(OneOrMany.Create(indexerNameAttributeLists), ref temp, earlyDecodingOnly: true);
+                    Binder rootBinder = GetAttributeBinder(indexerNameAttributeLists, DeclaringCompilation);
+                    LoadAndValidateAttributes(
+                        OneOrMany.Create(indexerNameAttributeLists), ref temp, earlyDecodingOnly: true,
+                        binderOpt: rootBinder,
+                        attributeMatchesOpt: this.GetIsNewExtensionMember() ? isPossibleIndexerNameAttributeInExtension : isPossibleIndexerNameAttribute);
                     if (temp != null)
                     {
                         Debug.Assert(temp.IsEarlyDecodedWellKnownAttributeDataComputed);
@@ -486,6 +491,24 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 }
 
                 return _lazySourceName;
+
+                static bool isPossibleIndexerNameAttribute(AttributeSyntax node, Binder? rootBinderOpt)
+                {
+                    Debug.Assert(rootBinderOpt is not null);
+                    QuickAttributeChecker checker = rootBinderOpt.QuickAttributeChecker;
+                    return checker.IsPossibleMatch(node, QuickAttributes.IndexerName);
+                }
+
+                static bool isPossibleIndexerNameAttributeInExtension(AttributeSyntax node, Binder? rootBinderOpt)
+                {
+                    // Tracked by https://github.com/dotnet/roslyn/issues/76130 : Temporarily limit binding to a string literal argument in order to avoid a binding cycle.
+                    if (node.ArgumentList?.Arguments is not [{ NameColon: null, NameEquals: null, Expression: LiteralExpressionSyntax { RawKind: (int)SyntaxKind.StringLiteralExpression } }])
+                    {
+                        return false;
+                    }
+
+                    return isPossibleIndexerNameAttribute(node, rootBinderOpt);
+                }
             }
         }
 #nullable disable
@@ -756,19 +779,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 if (_lazyMergedBackingField is null)
                 {
                     var backingField = DeclaredBackingField;
-                    // The property should only be used after members in the containing
-                    // type are complete, and partial members have been merged.
-                    if (!_containingType.AreMembersComplete)
-                    {
-                        // When calling through the SemanticModel, partial members are not
-                        // necessarily merged when the containing type includes a primary
-                        // constructor - see https://github.com/dotnet/roslyn/issues/75002.
-                        Debug.Assert(_containingType.PrimaryConstructor is { });
-                        return backingField;
-                    }
-                    Interlocked.CompareExchange(ref _lazyMergedBackingField, backingField, null);
+                    // The property should only be used after partial members have been merged.
+                    Debug.Assert(!IsPartial);
+                    Interlocked.CompareExchange(ref _lazyMergedBackingField, new StrongBox<SynthesizedBackingFieldSymbol?>(backingField), null);
                 }
-                return _lazyMergedBackingField;
+                return _lazyMergedBackingField.Value;
             }
         }
 
@@ -787,8 +802,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         internal void SetMergedBackingField(SynthesizedBackingFieldSymbol? backingField)
         {
-            Interlocked.CompareExchange(ref _lazyMergedBackingField, backingField, null);
-            Debug.Assert((object?)_lazyMergedBackingField == backingField);
+            Interlocked.CompareExchange(ref _lazyMergedBackingField, new StrongBox<SynthesizedBackingFieldSymbol?>(backingField), null);
+            Debug.Assert((object?)_lazyMergedBackingField.Value == backingField);
         }
 
         private SynthesizedBackingFieldSymbol CreateBackingField()
@@ -1116,6 +1131,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             else if (ContainingType.IsSealed && this.DeclaredAccessibility.HasProtected() && !this.IsOverride)
             {
                 diagnostics.Add(AccessCheck.GetProtectedMemberInSealedTypeError(ContainingType), location, this);
+            }
+            else if (ContainingType is { IsExtension: true, ExtensionParameter.Name: "" } && !IsStatic)
+            {
+                diagnostics.Add(ErrorCode.ERR_InstanceMemberWithUnnamedExtensionsParameter, location, Name);
             }
             else if (ContainingType.IsStatic && !IsStatic)
             {
@@ -1451,7 +1470,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
                 return (null, null);
             }
-            else if (IsIndexer && CSharpAttributeData.IsTargetEarlyAttribute(arguments.AttributeType, arguments.AttributeSyntax, AttributeDescription.OverloadResolutionPriorityAttribute))
+            else if ((IsIndexer || this.GetIsNewExtensionMember()) && CSharpAttributeData.IsTargetEarlyAttribute(arguments.AttributeType, arguments.AttributeSyntax, AttributeDescription.OverloadResolutionPriorityAttribute))
             {
                 (attributeData, boundAttribute) = arguments.Binder.GetAttribute(arguments.AttributeSyntax, arguments.AttributeType, beforeAttributePartBound: null, afterAttributePartBound: null, out var hasAnyDiagnostics);
 
@@ -1703,12 +1722,18 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 {
                     diagnostics.Add(ErrorCode.ERR_BadArgumentToAttribute, node.ArgumentList.Arguments[0].Location, node.GetErrorDisplayName());
                 }
+                else if (this.GetIsNewExtensionMember() && SourceName != indexerName)
+                {
+                    // Tracked by https://github.com/dotnet/roslyn/issues/76130 : Report more descriptive error
+                    // error CS8078: An expression is too long or complex to compile
+                    diagnostics.Add(ErrorCode.ERR_InsufficientStack, node.ArgumentList.Arguments[0].Location);
+                }
             }
         }
 
         internal sealed override int TryGetOverloadResolutionPriority()
         {
-            Debug.Assert(this.IsIndexer);
+            Debug.Assert(this.IsIndexer || this.GetIsNewExtensionMember());
             return GetEarlyDecodedWellKnownAttributeData()?.OverloadResolutionPriority ?? 0;
         }
 
@@ -1839,9 +1864,17 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             {
                 diagnostics.Add(ErrorCode.ERR_FieldCantBeRefAny, TypeLocation, type);
             }
-            else if (this.IsAutoPropertyOrUsesFieldKeyword && type.IsRefLikeOrAllowsRefLikeType() && (this.IsStatic || !this.ContainingType.IsRefLikeType))
+            else if (this.IsAutoPropertyOrUsesFieldKeyword)
             {
-                diagnostics.Add(ErrorCode.ERR_FieldAutoPropCantBeByRefLike, TypeLocation, type);
+                if (!this.IsStatic && (ContainingType.IsRecord || ContainingType.IsRecordStruct) && type.IsPointerOrFunctionPointer())
+                {
+                    // The type '{0}' may not be used for a field of a record.
+                    diagnostics.Add(ErrorCode.ERR_BadFieldTypeInRecord, TypeLocation, type);
+                }
+                else if (type.IsRefLikeOrAllowsRefLikeType() && (this.IsStatic || !this.ContainingType.IsRefLikeType))
+                {
+                    diagnostics.Add(ErrorCode.ERR_FieldAutoPropCantBeByRefLike, TypeLocation, type);
+                }
             }
 
             if (type.IsStatic)

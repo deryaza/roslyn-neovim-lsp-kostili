@@ -26,9 +26,9 @@ using Xunit;
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractClass;
 
 [UseExportProvider]
-public class ExtractClassTests
+public sealed class ExtractClassTests
 {
-    private class Test : CSharpCodeRefactoringVerifier<CSharpExtractClassCodeRefactoringProvider>.Test
+    private sealed class Test : CSharpCodeRefactoringVerifier<CSharpExtractClassCodeRefactoringProvider>.Test
     {
         public IEnumerable<(string name, bool makeAbstract)>? DialogSelection { get; set; }
         public bool SameFile { get; set; }
@@ -38,7 +38,7 @@ public class ExtractClassTests
 
         protected override IEnumerable<CodeRefactoringProvider> GetCodeRefactoringProviders()
         {
-            var service = new TestExtractClassOptionsService(DialogSelection, SameFile, IsClassDeclarationSelection)
+            var service = new TestExtractClassOptionsService(DialogSelection, WorkspaceKind != CodeAnalysis.WorkspaceKind.MiscellaneousFiles ? SameFile : true, IsClassDeclarationSelection)
             {
                 FileName = FileName
             };
@@ -131,10 +131,24 @@ public class ExtractClassTests
                 }
             }
             """;
+        var expected = """
+            internal class MyBase
+            {
+                int Method()
+                {
+                    return 1 + 1;
+                }
+            }
+
+            class Test : MyBase
+            {
+            }
+            """;
 
         await new Test
         {
             TestCode = input,
+            FixedCode = expected,
             WorkspaceKind = WorkspaceKind.MiscellaneousFiles
         }.RunAsync();
     }
@@ -1255,6 +1269,7 @@ public class ExtractClassTests
             // this is my real document header
 
             namespace ConsoleApp185;
+
             using System;
             using System.Collections.Generic;
 

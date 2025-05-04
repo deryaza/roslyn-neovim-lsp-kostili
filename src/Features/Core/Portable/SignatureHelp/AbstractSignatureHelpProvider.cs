@@ -27,12 +27,12 @@ internal abstract partial class AbstractSignatureHelpProvider : ISignatureHelpPr
         SymbolDisplayFormat.MinimallyQualifiedFormat.WithGenericsOptions(
             SymbolDisplayFormat.MinimallyQualifiedFormat.GenericsOptions & ~SymbolDisplayGenericsOptions.IncludeTypeParameters);
 
+    public abstract ImmutableArray<char> TriggerCharacters { get; }
+    public abstract ImmutableArray<char> RetriggerCharacters { get; }
+
     protected AbstractSignatureHelpProvider()
     {
     }
-
-    public abstract bool IsTriggerCharacter(char ch);
-    public abstract bool IsRetriggerCharacter(char ch);
 
     protected abstract Task<SignatureHelpItems?> GetItemsWorkerAsync(Document document, int position, SignatureHelpTriggerInfo triggerInfo, MemberDisplayOptions options, CancellationToken cancellationToken);
 
@@ -254,7 +254,7 @@ internal abstract partial class AbstractSignatureHelpProvider : ISignatureHelpPr
             return itemsForCurrentDocument;
         }
 
-        var totalProjects = relatedDocuments.Select(d => d.Project.Id).Concat(document.Project.Id);
+        var totalProjects = relatedDocuments.Concat(document).SelectAsArray(d => d.Project.Id);
 
         var semanticModel = await document.ReuseExistingSpeculativeModelAsync(position, cancellationToken).ConfigureAwait(false);
         var compilation = semanticModel.Compilation;
@@ -277,7 +277,7 @@ internal abstract partial class AbstractSignatureHelpProvider : ISignatureHelpPr
                 symbolKey = SymbolKey.Create(methodSymbol.OriginalDefinition, cancellationToken);
             }
 
-            var invalidProjectsForCurrentSymbol = new List<ProjectId>();
+            using var _ = ArrayBuilder<ProjectId>.GetInstance(out var invalidProjectsForCurrentSymbol);
             foreach (var relatedDocument in relatedDocuments)
             {
                 // Try to resolve symbolKey in each related compilation,
@@ -289,7 +289,7 @@ internal abstract partial class AbstractSignatureHelpProvider : ISignatureHelpPr
                 }
             }
 
-            var platformData = new SupportedPlatformData(document.Project.Solution, invalidProjectsForCurrentSymbol, totalProjects);
+            var platformData = new SupportedPlatformData(document.Project.Solution, invalidProjectsForCurrentSymbol.ToImmutableAndClear(), totalProjects);
             finalItems.Add(UpdateItem(item, platformData));
         }
 

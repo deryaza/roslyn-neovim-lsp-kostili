@@ -18,7 +18,9 @@ internal static class FeatureAttribute
     public const string CodeModel = nameof(CodeModel);
     public const string ColorScheme = nameof(ColorScheme);
     public const string CompletionSet = nameof(CompletionSet);
+    public const string CopilotImplementNotImplementedException = nameof(CopilotImplementNotImplementedException);
     public const string CopilotSuggestions = nameof(CopilotSuggestions);
+    public const string CopilotChangeAnalysis = nameof(CopilotChangeAnalysis);
     public const string DesignerAttributes = nameof(DesignerAttributes);
     public const string DiagnosticService = nameof(DiagnosticService);
     public const string DocumentOutline = nameof(DocumentOutline);
@@ -30,6 +32,7 @@ internal static class FeatureAttribute
     public const string ExtractMethod = nameof(ExtractMethod);
     public const string FindReferences = nameof(FindReferences);
     public const string SemanticSearch = nameof(SemanticSearch);
+    public const string GenerateDocumentation = nameof(GenerateDocumentation);
     public const string GlobalOperation = nameof(GlobalOperation);
     public const string GoToBase = nameof(GoToBase);
     public const string GoToDefinition = nameof(GoToDefinition);

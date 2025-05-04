@@ -1,14 +1,16 @@
-// Licensed to the .NET Foundation under one or more agreements.
+﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Completion.Providers;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Completion.Providers;
+using Microsoft.CodeAnalysis.CSharp.Shared.Extensions;
 using Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionProviders;
 using Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.AsyncCompletion;
 using Microsoft.CodeAnalysis.Test.Utilities;
@@ -19,7 +21,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionSe
 
 [UseExportProvider]
 [Trait(Traits.Feature, Traits.Features.Completion)]
-public partial class SymbolCompletionProviderTests : AbstractCSharpCompletionProviderTests
+public sealed partial class SymbolCompletionProviderTests : AbstractCSharpCompletionProviderTests
 {
     internal override Type GetCompletionProviderType()
         => typeof(SymbolCompletionProvider);
@@ -8783,8 +8785,8 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
         var expectedDescription = $"""
             ({FeaturesResources.field}) int C.x
 
-            {string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available)}
-            {string.Format(FeaturesResources._0_1, "Proj2", FeaturesResources.Not_Available)}
+                {string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available)}
+                {string.Format(FeaturesResources._0_1, "Proj2", FeaturesResources.Not_Available)}
 
             {FeaturesResources.You_can_use_the_navigation_bar_to_switch_contexts}
             """;
@@ -8823,9 +8825,9 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
         var expectedDescription = $"""
             ({FeaturesResources.field}) int C.x
 
-            {string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available)}
-            {string.Format(FeaturesResources._0_1, "Proj2", FeaturesResources.Not_Available)}
-            {string.Format(FeaturesResources._0_1, "Proj3", FeaturesResources.Not_Available)}
+                {string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available)}
+                {string.Format(FeaturesResources._0_1, "Proj2", FeaturesResources.Not_Available)}
+                {string.Format(FeaturesResources._0_1, "Proj3", FeaturesResources.Not_Available)}
 
             {FeaturesResources.You_can_use_the_navigation_bar_to_switch_contexts}
             """;
@@ -8867,8 +8869,8 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
         var expectedDescription = $"""
             ({FeaturesResources.field}) int C.x
 
-            {string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available)}
-            {string.Format(FeaturesResources._0_1, "Proj3", FeaturesResources.Not_Available)}
+                {string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available)}
+                {string.Format(FeaturesResources._0_1, "Proj3", FeaturesResources.Not_Available)}
 
             {FeaturesResources.You_can_use_the_navigation_bar_to_switch_contexts}
             """;
@@ -8914,9 +8916,9 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
         var expectedDescription = $"""
             void G.DoGStuff()
 
-            {string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Not_Available)}
-            {string.Format(FeaturesResources._0_1, "Proj2", FeaturesResources.Available)}
-            {string.Format(FeaturesResources._0_1, "Proj3", FeaturesResources.Not_Available)}
+                {string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Not_Available)}
+                {string.Format(FeaturesResources._0_1, "Proj2", FeaturesResources.Available)}
+                {string.Format(FeaturesResources._0_1, "Proj3", FeaturesResources.Not_Available)}
 
             {FeaturesResources.You_can_use_the_navigation_bar_to_switch_contexts}
             """;
@@ -8979,8 +8981,8 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
         var expectedDescription = $"""
             ({FeaturesResources.local_variable}) int xyz
 
-            {string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available)}
-            {string.Format(FeaturesResources._0_1, "Proj2", FeaturesResources.Not_Available)}
+                {string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available)}
+                {string.Format(FeaturesResources._0_1, "Proj2", FeaturesResources.Not_Available)}
 
             {FeaturesResources.You_can_use_the_navigation_bar_to_switch_contexts}
             """;
@@ -12789,6 +12791,64 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
             matchingFilters: [FilterSet.MethodFilter, FilterSet.TargetTypedFilter]);
     }
 
+    [InlineData("IGoo", new string[] { "Goo", "GooDerived", "GooGeneric" })]
+    [InlineData("IGoo[]", new string[] { "IGoo", "IGooGeneric", "Goo", "GooAbstract", "GooDerived", "GooGeneric" })]
+    [InlineData("IGooGeneric<int>", new string[] { "GooGeneric" })]
+    [InlineData("IGooGeneric<int>[]", new string[] { "IGooGeneric", "GooGeneric" })]
+    [InlineData("IOther", new string[] { })]
+    [InlineData("Goo", new string[] { "Goo" })]
+    [InlineData("GooAbstract", new string[] { "GooDerived" })]
+    [InlineData("GooDerived", new string[] { "GooDerived" })]
+    [InlineData("GooGeneric<int>", new string[] { "GooGeneric" })]
+    [InlineData("object", new string[] { "C", "Goo", "GooDerived", "GooGeneric" })]
+    [Theory, Trait(Traits.Feature, Traits.Features.TargetTypedCompletion)]
+    public async Task TestTargetTypeCompletionInCreationContext(string targetType, string[] expectedItems)
+    {
+        ShowTargetTypedCompletionFilter = true;
+
+        var markup =
+            $$"""
+            interface IGoo { }
+            interface IGooGeneric<T> : IGoo { }
+            interface IOther { }
+            class Goo : IGoo { }
+            abstract class GooAbstract : IGoo { }
+            class GooDerived : GooAbstract { }
+            class GooGeneric<T> : IGooGeneric<T> { }
+            
+            class C
+            {
+                void M1({{targetType}} arg) { }
+
+                void M2()
+                    => M1(new $$);
+            }
+            """;
+
+        (string Name, bool IsClass, string? DisplaySuffix)[] types = [
+            ("IGoo", false, null),
+            ("IGooGeneric", false, "<>"),
+            ("IOther", false, null),
+            ("Goo", true, null),
+            ("GooAbstract", true, null),
+            ("GooDerived", true, null),
+            ("GooGeneric", true, "<>"),
+            ("C", true, null)
+        ];
+
+        foreach (var item in types.Where(t => t.IsClass && expectedItems.Contains(t.Name)))
+            await VerifyItemExistsAsync(markup, item.Name, matchingFilters: [FilterSet.ClassFilter, FilterSet.TargetTypedFilter], displayTextSuffix: item.DisplaySuffix);
+
+        foreach (var item in types.Where(t => t.IsClass && !expectedItems.Contains(t.Name)))
+            await VerifyItemExistsAsync(markup, item.Name, matchingFilters: [FilterSet.ClassFilter], displayTextSuffix: item.DisplaySuffix);
+
+        foreach (var item in types.Where(t => !t.IsClass && expectedItems.Contains(t.Name)))
+            await VerifyItemExistsAsync(markup, item.Name, matchingFilters: [FilterSet.InterfaceFilter, FilterSet.TargetTypedFilter], displayTextSuffix: item.DisplaySuffix);
+
+        foreach (var item in types.Where(t => !t.IsClass && !expectedItems.Contains(t.Name)))
+            await VerifyItemExistsAsync(markup, item.Name, matchingFilters: [FilterSet.InterfaceFilter], displayTextSuffix: item.DisplaySuffix);
+    }
+
     [Fact, Trait(Traits.Feature, Traits.Features.KeywordRecommending)]
     public async Task TestTypesNotSuggestedInDeclarationDeconstruction()
     {
@@ -13230,7 +13290,7 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
             """;
         await VerifyItemExistsAsync(MakeMarkup(source), "parameter");
 
-        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: "10"), "parameter");
+        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: LanguageVersion.CSharp10), "parameter");
     }
 
     [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/60812")]
@@ -13309,7 +13369,7 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
             """;
         await VerifyItemExistsAsync(MakeMarkup(source), "parameter");
 
-        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: "10"), "parameter");
+        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: LanguageVersion.CSharp10), "parameter");
     }
 
     [Fact]
@@ -13326,7 +13386,7 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
             """;
         await VerifyItemExistsAsync(MakeMarkup(source), "parameter");
 
-        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: "10"), "parameter");
+        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: LanguageVersion.CSharp10), "parameter");
     }
 
     [Fact]
@@ -13343,7 +13403,7 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
             """;
         await VerifyItemExistsAsync(MakeMarkup(source), "parameter");
 
-        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: "10"), "parameter");
+        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: LanguageVersion.CSharp10), "parameter");
     }
 
     [Fact]
@@ -13360,7 +13420,7 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
             """;
         await VerifyItemExistsAsync(MakeMarkup(source), "parameter");
 
-        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: "10"), "parameter");
+        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: LanguageVersion.CSharp10), "parameter");
     }
 
     [Fact]
@@ -13372,7 +13432,7 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
             """;
         await VerifyItemExistsAsync(MakeMarkup(source), "parameter");
 
-        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: "10"), "parameter");
+        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: LanguageVersion.CSharp10), "parameter");
     }
 
     [Fact]
@@ -13383,7 +13443,7 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
             """;
         await VerifyItemExistsAsync(MakeMarkup(source), "parameter");
 
-        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: "10"), "parameter");
+        await VerifyItemExistsAsync(MakeMarkup(source, languageVersion: LanguageVersion.CSharp10), "parameter");
     }
 
     [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/64585")]
@@ -15021,11 +15081,53 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
         ]);
     }
 
-    private static string MakeMarkup([StringSyntax(PredefinedEmbeddedLanguageNames.CSharpTest)] string source, string languageVersion = "Preview")
+    [Theory, CombinatorialData]
+    public async Task PartialPropertyOrConstructor(
+        [CombinatorialValues("class", "struct", "record", "record class", "record struct", "interface")] string typeKind,
+        [CombinatorialValues("", "public", "private", "static", "extern")] string modifiers)
+    {
+        var markup = $$"""
+            partial {{typeKind}} C
+            {
+                {{modifiers}} partial $$
+            }
+            """;
+        await VerifyExpectedItemsAsync(markup, [
+            ItemExpectation.Exists("C"),
+        ]);
+    }
+
+    [Fact]
+    public async Task ModernExtensionMethod1()
+    {
+        var source = """
+            static class C
+            {
+                extension(string s)
+                {
+                    public bool IsNullOrEmpty() => false;
+                }
+
+                void M(string s)
+                {
+                    s.$$
+                }
+            }
+            """;
+        await VerifyItemExistsAsync(
+            MakeMarkup(source),
+            "IsNullOrEmpty",
+            sourceCodeKind: SourceCodeKind.Regular,
+            glyph: Glyph.ExtensionMethodPublic);
+    }
+
+    private static string MakeMarkup(
+        [StringSyntax(PredefinedEmbeddedLanguageNames.CSharpTest)] string source,
+        LanguageVersion languageVersion = LanguageVersion.Preview)
     {
         return $$"""
 <Workspace>
-    <Project Language="C#" AssemblyName="Assembly" CommonReferencesNet6="true" LanguageVersion="{{languageVersion}}">
+    <Project Language="C#" AssemblyName="Assembly" CommonReferencesNet6="true" LanguageVersion="{{languageVersion.ToDisplayString()}}">
         <Document FilePath="Test.cs">
 {{source}}
         </Document>
@@ -15035,14 +15137,5 @@ expectedDescriptionOrNull: null, sourceCodeKind: SourceCodeKind.Script);
     }
 
     public static IEnumerable<object[]> ValidEnumUnderlyingTypeNames()
-    {
-        yield return new object[] { "Byte" };
-        yield return new object[] { "SByte" };
-        yield return new object[] { "Int16" };
-        yield return new object[] { "UInt16" };
-        yield return new object[] { "Int32" };
-        yield return new object[] { "UInt32" };
-        yield return new object[] { "Int64" };
-        yield return new object[] { "UInt64" };
-    }
+        => [["Byte"], ["SByte"], ["Int16"], ["UInt16"], ["Int32"], ["UInt32"], ["Int64"], ["UInt64"]];
 }

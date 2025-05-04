@@ -13,7 +13,7 @@ using Xunit;
 
 namespace Microsoft.CodeAnalysis.UnitTests;
 
-public class VisualStudioOptionStorageTests
+public sealed class VisualStudioOptionStorageTests
 {
     public static IEnumerable<object[]> ConfigNames
     {
@@ -240,9 +240,10 @@ public class VisualStudioOptionStorageTests
             "dotnet_enable_references_code_lens",                                           // VSCode only option.  Does not apply to VS.
             "dotnet_enable_tests_code_lens",                                                // VSCode only option.  Does not apply to VS.
             "dotnet_enable_auto_insert",                                                    // VSCode only option.  Does not apply to VS.
+            "dotnet_organize_imports_on_format",                                            // VSCode only option.  Does not apply to VS.
             "end_of_line",                                                                  // persisted by the editor
             "ExtensionManagerOptions_DisableCrashingExtensions",                            // TODO: remove? https://github.com/dotnet/roslyn/issues/66063
-            "FeatureOnOffOptions_RefactoringVerification",                                  // TODO: remove? https://github.com/dotnet/roslyn/issues/66063 
+            "FeatureOnOffOptions_RefactoringVerification",                                  // TODO: remove? https://github.com/dotnet/roslyn/issues/66063
             "FeatureOnOffOptions_RenameTracking",                                           // TODO: remove? https://github.com/dotnet/roslyn/issues/66063
             "file_header_template",                                                         // repository specific
             "dotnet_unsupported_wrapping_column",                                           // TODO: https://github.com/dotnet/roslyn/issues/66062
@@ -268,7 +269,6 @@ public class VisualStudioOptionStorageTests
             "SimplificationOptions_QualifyMemberAccessWithThisOrMe",                        // public option, deprecated
             "SimplificationOptions_QualifyMethodAccess",                                    // public option, deprecated
             "SimplificationOptions_QualifyPropertyAccess",                                  // public option, deprecated
-            "SolutionCrawlerOptionsStorage_SolutionBackgroundAnalysisScopeOption",          // handled by PackageSettingsPersister
         };
 
         Assert.Contains(configName, optionsWithoutStorage);

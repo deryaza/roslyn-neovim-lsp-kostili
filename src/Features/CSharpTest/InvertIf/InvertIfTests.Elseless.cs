@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.InvertIf;
 
-public partial class InvertIfTests
+public sealed partial class InvertIfTests
 {
     [Fact]
     public async Task IfWithoutElse_MoveIfBodyToElseClause1()
@@ -479,6 +479,76 @@ public partial class InvertIfTests
                         }
                     }
                 }
+            }
+            """);
+    }
+
+    [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/73917")]
+    public async Task IfWithoutElse_MoveSubsequentStatementsToIfBody4()
+    {
+        await TestAsync("""
+            public void SomeMethod()
+            {
+                object something = null;
+
+                [||]if (something == null)
+                {
+                    return;
+                }
+
+                #region A region
+                something = new object();
+                #endregion
+            }
+            """, """
+            public void SomeMethod()
+            {
+                object something = null;
+
+                if (something != null)
+                {
+                    #region A region
+                    something = new object();
+                    #endregion
+                }
+            }
+            """);
+    }
+
+    [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/73917")]
+    public async Task IfWithoutElse_MoveSubsequentStatementsToIfBody5()
+    {
+        await TestAsync("""
+            switch (o)
+            {
+                case 1:
+                    something = new object();
+                    
+                    [||]if (something == null)
+                    {
+                        return;
+                    }
+                    
+                    #region A region
+                    something = new object();
+                    #endregion
+                    break;
+            }
+            """, """
+            switch (o)
+            {
+                case 1:
+                    something = new object();
+
+                    if (something != null)
+                    {
+                        #region A region
+                        something = new object();
+                        #endregion
+                        break;
+                    }
+
+                    return;
             }
             """);
     }

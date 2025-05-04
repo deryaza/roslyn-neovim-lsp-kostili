@@ -11,11 +11,12 @@ using Microsoft.CodeAnalysis.Editor.EditorConfigSettings.DataProvider;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.Shared.Collections;
 using Microsoft.CodeAnalysis.Shared.TestHooks;
+using Microsoft.CodeAnalysis.Threading;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editor.EditorConfigSettings;
 
-internal partial class SettingsAggregator : ISettingsAggregator
+internal sealed partial class SettingsAggregator : ISettingsAggregator
 {
     private readonly Workspace _workspace;
     private readonly ISettingsProviderFactory<AnalyzerSetting> _analyzerProvider;
@@ -31,7 +32,7 @@ internal partial class SettingsAggregator : ISettingsAggregator
         IAsynchronousOperationListener listener)
     {
         _workspace = workspace;
-        _workspace.WorkspaceChanged += UpdateProviders;
+        _ = workspace.RegisterWorkspaceChangedHandler(UpdateProviders);
 
         var currentSolution = _workspace.CurrentSolution.SolutionState;
         UpdateProviders(currentSolution);
@@ -47,7 +48,7 @@ internal partial class SettingsAggregator : ISettingsAggregator
             threadingContext.DisposalToken);
     }
 
-    private void UpdateProviders(object? sender, WorkspaceChangeEventArgs e)
+    private void UpdateProviders(WorkspaceChangeEventArgs e)
     {
         switch (e.Kind)
         {
