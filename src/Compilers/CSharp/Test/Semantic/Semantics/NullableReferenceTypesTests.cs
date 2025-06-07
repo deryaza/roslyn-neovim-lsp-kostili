@@ -54206,8 +54206,9 @@ public static class Extensions
         }
 
         // <remarks>Ported from <see cref="FlowTests.NullCoalescing_CondAccess_NonNullConstantLeft"/>.</remarks>
-        [Fact]
-        public void NullCoalescing_CondAccess_NonNullConstantLeft()
+        [Theory, CombinatorialData, WorkItem("https://github.com/dotnet/roslyn/issues/78386")]
+        public void NullCoalescing_CondAccess_NonNullConstantLeft(
+            [CombinatorialValues(TargetFramework.Standard, TargetFramework.NetCoreApp)] TargetFramework targetFramework)
         {
             var source = @"
 static class C
@@ -54229,10 +54230,51 @@ static class C
     }
 }
 ";
-            CreateNullableCompilation(source).VerifyDiagnostics(
+            CreateCompilation(source, targetFramework: targetFramework, options: WithNullableEnable()).VerifyDiagnostics(
                 // (17,30): warning CS8602: Dereference of a possibly null reference.
                 //             : x.ToString() + y.ToString(); // 1
                 Diagnostic(ErrorCode.WRN_NullReferenceReceiver, "y").WithLocation(17, 30));
+        }
+
+        [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/78386")]
+        public void CondAccess_PostConditionInArgument_01()
+        {
+            var source = """
+                using System.Diagnostics.CodeAnalysis;
+                static class C
+                {
+                    static bool M1(this string s, [NotNullWhen(true)] string? x) => true;
+                    static void M2(string? x)
+                    {
+                        _ = ""?.M1(x = "s") ?? false
+                            ? x.ToString()
+                            : x.ToString();
+                    }
+                }
+                """;
+            CreateCompilation([source, NotNullWhenAttributeDefinition], options: WithNullableEnable()).VerifyDiagnostics();
+        }
+
+        [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/78386")]
+        public void CondAccess_PostConditionInArgument_02()
+        {
+            var source = """
+                using System.Diagnostics.CodeAnalysis;
+                static class C
+                {
+                    static bool M1(this string s, [NotNullWhen(true)] string? x) => true;
+                    static void M2(string? x)
+                    {
+                        _ = ""?.M1(x) ?? false
+                            ? x.ToString()
+                            : x.ToString();
+                    }
+                }
+                """;
+            CreateCompilation([source, NotNullWhenAttributeDefinition], options: WithNullableEnable()).VerifyDiagnostics(
+                // (9,15): warning CS8602: Dereference of a possibly null reference.
+                //             : x.ToString();
+                Diagnostic(ErrorCode.WRN_NullReferenceReceiver, "x").WithLocation(9, 15));
         }
 
         // <remarks>Ported from <see cref="FlowTests.NullCoalescing_NonNullConstantLeft"/>.</remarks>
