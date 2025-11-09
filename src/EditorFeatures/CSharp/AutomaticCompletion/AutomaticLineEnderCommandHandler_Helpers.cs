@@ -318,7 +318,7 @@ internal sealed partial class AutomaticLineEnderCommandHandler
                 root,
                 elseClauseNode,
                 WithBraces(elseClauseNode, formattingOptions),
-                elseClauseNode.Parent!,
+                elseClauseNode.Parent,
                 [innerStatement],
                 formattingOptions,
                 cancellationToken);
@@ -834,9 +834,6 @@ internal sealed partial class AutomaticLineEnderCommandHandler
     #endregion
 
     #region AddBrace
-
-    private static AccessorListSyntax GetAccessorListNode(SyntaxFormattingOptions formattingOptions)
-        => AccessorList().WithOpenBraceToken(GetOpenBrace(formattingOptions)).WithCloseBraceToken(GetCloseBrace(formattingOptions));
 
     private static InitializerExpressionSyntax GetInitializerExpressionNode(SyntaxFormattingOptions formattingOptions)
         => InitializerExpression(SyntaxKind.ObjectInitializerExpression)

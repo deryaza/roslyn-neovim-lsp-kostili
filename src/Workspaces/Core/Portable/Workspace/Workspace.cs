@@ -51,6 +51,11 @@ public abstract partial class Workspace : IDisposable
     private readonly NonReentrantLock _stateLock = new(useThisInstanceForSynchronization: true);
 
     /// <summary>
+    /// Cache for initializing generator drivers across different Solution instances from this Workspace.
+    /// </summary>
+    internal SolutionCompilationState.GeneratorDriverInitializationCache GeneratorDriverCreationCache { get; } = new();
+
+    /// <summary>
     /// Current solution.  Must be locked with <see cref="_serializationLock"/> when writing to it.
     /// </summary>
     private Solution _latestSolution;
@@ -192,7 +197,7 @@ public abstract partial class Workspace : IDisposable
                 return (solution, solution);
             }
 
-            _latestSolution = solution.WithNewWorkspace(oldSolution.WorkspaceKind, oldSolution.WorkspaceVersion + 1, oldSolution.Services);
+            _latestSolution = solution.WithNewWorkspaceFrom(oldSolution);
             return (oldSolution, _latestSolution);
         }
     }
@@ -274,6 +279,13 @@ public abstract partial class Workspace : IDisposable
             onAfterUpdate: static (oldSolution, newSolution, data) =>
             {
                 data.onAfterUpdate?.Invoke(oldSolution, newSolution);
+
+                // The GeneratorDriverCreationCache holds onto a primordial GeneratorDriver for a project when we first creat one. That way, if another fork
+                // of the Solution also needs to run generators, it's able to reuse that primordial driver rather than recreating one from scratch. We want to
+                // clean up that cache at some point so we're not holding onto unneeded GeneratorDrivers. We'll clean out some cached entries here for projects
+                // that have a GeneratorDriver held in CurrentSolution. The idea being that once a project has a GeneratorDriver in the CurrentSolution, all future
+                // requests for generated documents will just use the updated generator that project already has, so there will never be another need to create one.
+                data.@this.GeneratorDriverCreationCache.EmptyCacheForProjectsThatHaveGeneratorDriversInSolution(newSolution.CompilationState);
 
                 // Queue the event but don't execute its handlers on this thread.
                 // Doing so under the serialization lock guarantees the same ordering of the events
@@ -466,13 +478,13 @@ public abstract partial class Workspace : IDisposable
     /// <param name="onBeforeUpdate">Action to perform immediately prior to updating <see cref="CurrentSolution"/>.
     /// The action will be passed the old <see cref="CurrentSolution"/> that will be replaced and the exact solution
     /// it will be replaced with. The latter may be different than the solution returned by <paramref
-    /// name="transformation"/> as it will have its <see cref="Solution.WorkspaceVersion"/> updated
-    /// accordingly.  This will only be run once.</param>
+    /// name="transformation"/> as it may its <see cref="Solution.SolutionStateContentVersion"/> updated
+    /// (if it's <see cref="SolutionState"/> actually changed).  This will only be run once.</param>
     /// <param name="onAfterUpdate">Action to perform once <see cref="CurrentSolution"/> has been updated.  The
     /// action will be passed the old <see cref="CurrentSolution"/> that was just replaced and the exact solution it
     /// was replaced with. The latter may be different than the solution returned by <paramref
-    /// name="transformation"/> as it will have its <see cref="Solution.WorkspaceVersion"/> updated
-    /// accordingly.  This will only be run once.</param>
+    /// name="transformation"/> as it may have its <see cref="Solution.SolutionStateContentVersion"/> updated
+    /// (if it's <see cref="SolutionState"/> actually changed).  This will only be run once.</param>
     private protected (Solution oldSolution, Solution newSolution) SetCurrentSolution<TData>(
         TData data,
         Func<Solution, TData, Solution> transformation,
@@ -536,7 +548,7 @@ public abstract partial class Workspace : IDisposable
                         continue;
                     }
 
-                    newSolution = newSolution.WithNewWorkspace(oldSolution.WorkspaceKind, oldSolution.WorkspaceVersion + 1, oldSolution.Services);
+                    newSolution = newSolution.WithNewWorkspaceFrom(oldSolution);
 
                     // Prior to updating the latest solution, let the caller do any other state updates they want.
                     onBeforeUpdate?.Invoke(oldSolution, newSolution, data);
@@ -1567,7 +1579,7 @@ public abstract partial class Workspace : IDisposable
             var oldSolution = this.CurrentSolution;
 
             // If the workspace has already accepted an update, then fail
-            if (newSolution.WorkspaceVersion != oldSolution.WorkspaceVersion)
+            if (newSolution.SolutionStateContentVersion != oldSolution.SolutionStateContentVersion)
             {
                 Logger.Log(
                     FunctionId.Workspace_ApplyChanges,
@@ -1575,9 +1587,7 @@ public abstract partial class Workspace : IDisposable
                     {
                         // 'oldSolution' is the current workspace solution; if we reach this point we know
                         // 'oldSolution' is newer than the expected workspace solution 'newSolution'.
-                        var oldWorkspaceVersion = oldSolution.WorkspaceVersion;
-                        var newWorkspaceVersion = newSolution.WorkspaceVersion;
-                        return $"Apply Failed: Workspace has already been updated (from version '{newWorkspaceVersion}' to '{oldWorkspaceVersion}')";
+                        return $"Apply Failed: Content version has already been updated (from '{newSolution.SolutionStateContentVersion}' to '{oldSolution.SolutionStateContentVersion}')";
                     },
                     oldSolution,
                     newSolution);
@@ -1618,7 +1628,7 @@ public abstract partial class Workspace : IDisposable
                 this.ApplyProjectRemoved(proj.Id);
             }
 
-            if (this.CurrentSolution.Options != newSolution.Options)
+            if (oldSolution.Options != newSolution.Options)
             {
                 var changedOptions = newSolution.SolutionState.Options.GetChangedOptions();
                 _legacyOptions.SetOptions(changedOptions.internallyDefined, changedOptions.externallyDefined);
@@ -2372,7 +2382,7 @@ public abstract partial class Workspace : IDisposable
     }
 
     /// <summary>
-    /// Throws an exception is the project is part of the current solution.
+    /// Throws an exception if the project is part of the current solution.
     /// </summary>
     protected void CheckProjectIsNotInCurrentSolution(ProjectId projectId)
         => CheckProjectIsNotInSolution(this.CurrentSolution, projectId);

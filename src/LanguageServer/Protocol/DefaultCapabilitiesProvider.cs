@@ -133,7 +133,16 @@ internal sealed class ExperimentalCapabilitiesProvider : ICapabilitiesProvider
         };
 
         // Using VS server capabilities because we have our own custom client.
-        capabilities.OnAutoInsertProvider = new VSInternalDocumentOnAutoInsertOptions { TriggerCharacters = ["'", "/", "\n"] };
+        capabilities.OnAutoInsertProvider = new VSInternalDocumentOnAutoInsertOptions { TriggerCharacters = ["'", "/", "\n", "\""] };
+
+        var diagnosticDynamicRegistationCapabilities = clientCapabilities.TextDocument?.Diagnostic?.DynamicRegistration;
+        if (diagnosticDynamicRegistationCapabilities is false)
+        {
+            capabilities.DiagnosticOptions = new DiagnosticOptions()
+            {
+                InterFileDependencies = true
+            };
+        }
 
         // so neovim starts automatically issue diagnostic requests
         capabilities.DiagnosticOptions = new(new DiagnosticRegistrationOptions() { InterFileDependencies = true, WorkspaceDiagnostics = true });

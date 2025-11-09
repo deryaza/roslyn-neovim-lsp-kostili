@@ -14,7 +14,6 @@ using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.LanguageService;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Simplification;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.ReplacePropertyWithMethods;
 
@@ -151,7 +150,7 @@ internal abstract class AbstractReplacePropertyWithMethodsService<TIdentifierNam
         private static readonly GetWriteValue s_getWriteValueForLeftSideOfAssignment =
             (replacer, parent) =>
             {
-                return (TExpressionSyntax)replacer._syntaxFacts.GetRightHandSideOfAssignment(parent)!;
+                return (TExpressionSyntax)replacer._syntaxFacts.GetRightHandSideOfAssignment(parent);
             };
 
         private static readonly GetWriteValue s_getWriteValueForIncrementOrDecrement =
@@ -261,7 +260,7 @@ internal abstract class AbstractReplacePropertyWithMethodsService<TIdentifierNam
                     readExpression);
 
                 // We know declarator isn't null due to the earlier call to IsInferredAnonymousObjectMemberDeclarator
-                _editor.ReplaceNode(declarator!, newDeclarator);
+                _editor.ReplaceNode(declarator, newDeclarator);
             }
             else if (_syntaxFacts.IsRightOfQualifiedName(_identifierName))
             {

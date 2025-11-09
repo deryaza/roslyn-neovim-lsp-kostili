@@ -628,7 +628,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             AdjustConditionalState(node);
         }
 
-        private void AdjustConditionalState(BoundExpression node)
+        protected void AdjustConditionalState(BoundExpression node)
         {
             if (IsConstantTrue(node))
             {
@@ -1403,7 +1403,8 @@ namespace Microsoft.CodeAnalysis.CSharp
             SyntaxNode syntax,
             bool isCall)
         {
-            if (isCall)
+            // Extern local function bodies are not visited, so ignore their state.
+            if (isCall && !symbol.IsExtern)
             {
                 Join(ref State, ref localFunctionState.StateFromBottom);
 
@@ -1641,7 +1642,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             static bool ignoreReceiver(MethodSymbol method)
             {
                 // static methods that aren't extensions get an implicit `this` receiver that should be ignored
-                return method.IsStatic && !method.IsExtensionMethod; // Tracked by https://github.com/dotnet/roslyn/issues/76130: Test this code path with new extensions
+                return method.IsStatic && !method.IsExtensionMethod;
             }
         }
 
@@ -1917,7 +1918,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 Optional<TLocalState> oldTryState = NonMonotonicState;
                 NonMonotonicState = ReachableBottomState();
-                VisitTryBlock(tryBlock, node, ref tryState);
+                VisitTryBlock(tryBlock, node);
                 var tempTryStateValue = NonMonotonicState.Value;
                 Join(ref tryState, ref tempTryStateValue);
                 if (oldTryState.HasValue)
@@ -1931,11 +1932,11 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
             else
             {
-                VisitTryBlock(tryBlock, node, ref tryState);
+                VisitTryBlock(tryBlock, node);
             }
         }
 
-        protected virtual void VisitTryBlock(BoundStatement tryBlock, BoundTryStatement node, ref TLocalState tryState)
+        protected virtual void VisitTryBlock(BoundStatement tryBlock, BoundTryStatement node)
         {
             VisitStatement(tryBlock);
         }
@@ -1946,7 +1947,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 Optional<TLocalState> oldTryState = NonMonotonicState;
                 NonMonotonicState = ReachableBottomState();
-                VisitCatchBlock(catchBlock, ref finallyState);
+                VisitCatchBlock(catchBlock);
                 var tempTryStateValue = NonMonotonicState.Value;
                 Join(ref finallyState, ref tempTryStateValue);
                 if (oldTryState.HasValue)
@@ -1960,11 +1961,11 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
             else
             {
-                VisitCatchBlock(catchBlock, ref finallyState);
+                VisitCatchBlock(catchBlock);
             }
         }
 
-        protected virtual void VisitCatchBlock(BoundCatchBlock catchBlock, ref TLocalState finallyState)
+        public override BoundNode VisitCatchBlock(BoundCatchBlock catchBlock)
         {
             if (catchBlock.ExceptionSourceOpt != null)
             {
@@ -1983,6 +1984,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
 
             VisitStatement(catchBlock.Body);
+            return null;
         }
 
         private void VisitFinallyBlockWithAnyTransferFunction(BoundStatement finallyBlock, ref TLocalState stateMovedUp)
@@ -1991,7 +1993,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 Optional<TLocalState> oldTryState = NonMonotonicState;
                 NonMonotonicState = ReachableBottomState();
-                VisitFinallyBlock(finallyBlock, ref stateMovedUp);
+                VisitFinallyBlock(finallyBlock);
                 var tempTryStateValue = NonMonotonicState.Value;
                 Join(ref stateMovedUp, ref tempTryStateValue);
                 if (oldTryState.HasValue)
@@ -2005,11 +2007,11 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
             else
             {
-                VisitFinallyBlock(finallyBlock, ref stateMovedUp);
+                VisitFinallyBlock(finallyBlock);
             }
         }
 
-        protected virtual void VisitFinallyBlock(BoundStatement finallyBlock, ref TLocalState stateMovedUp)
+        protected virtual void VisitFinallyBlock(BoundStatement finallyBlock)
         {
             VisitStatement(finallyBlock); // this should generate no pending branches
         }
@@ -2450,14 +2452,36 @@ namespace Microsoft.CodeAnalysis.CSharp
                 stack.Push(binary);
             }
 
+            VisitBinaryLogicalOperatorChildren(stack);
+            stack.Free();
+        }
+
+        protected virtual void VisitBinaryLogicalOperatorChildren(ArrayBuilder<BoundExpression> stack)
+        {
+            BoundExpression binary;
             Debug.Assert(stack.Count > 0);
+
+            binary = stack.Pop();
+
+            BoundExpression child;
+            switch (binary.Kind)
+            {
+                case BoundKind.BinaryOperator:
+                    var binOp = (BoundBinaryOperator)binary;
+                    child = binOp.Left;
+                    break;
+                case BoundKind.UserDefinedConditionalLogicalOperator:
+                    var udBinOp = (BoundUserDefinedConditionalLogicalOperator)binary;
+                    child = udBinOp.Left;
+                    break;
+                default:
+                    throw ExceptionUtilities.UnexpectedValue(binary.Kind);
+            }
 
             VisitCondition(child);
 
             while (true)
             {
-                binary = stack.Pop();
-
                 BinaryOperatorKind kind;
                 BoundExpression right;
                 switch (binary.Kind)
@@ -2479,6 +2503,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 var op = kind.Operator();
                 var isAnd = op == BinaryOperatorKind.And;
                 var isBool = kind.OperandTypes() == BinaryOperatorKind.Bool;
+                Debug.Assert(!isBool || binary.Kind != BoundKind.UserDefinedConditionalLogicalOperator);
 
                 Debug.Assert(isAnd || op == BinaryOperatorKind.Or);
 
@@ -2494,10 +2519,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
 
                 AdjustConditionalState(binary);
+                binary = stack.Pop();
             }
-
-            Debug.Assert((object)binary == node);
-            stack.Free();
         }
 
         protected virtual void AfterLeftChildOfBinaryLogicalOperatorHasBeenVisited(BoundExpression binary, BoundExpression right, bool isAnd, bool isBool, ref TLocalState leftTrue, ref TLocalState leftFalse)

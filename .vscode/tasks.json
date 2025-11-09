@@ -54,7 +54,7 @@
         "group": "build"
     },
     {
-        "label": "build Roslyn.sln",
+        "label": "build Roslyn.slnx",
         "command": "dotnet",
         "type": "shell",
         "args": [
@@ -62,13 +62,13 @@
           "-p:RunAnalyzersDuringBuild=false",
           "-p:GenerateFullPaths=true",
           "-tl:off",
-          "Roslyn.sln"
+          "Roslyn.slnx"
         ],
         "problemMatcher": "$msCompile",
         "group": "build"
     },
     {
-        "label": "build Roslyn.sln with analyzers",
+        "label": "build Roslyn.slnx with analyzers",
         "command": "dotnet",
         "type": "shell",
         "args": [
@@ -76,7 +76,7 @@
           "-p:RunAnalyzersDuringBuild=true",
           "-p:GenerateFullPaths=true",
           "-tl:off",
-          "Roslyn.sln"
+          "Roslyn.slnx"
         ],
         "problemMatcher": "$msCompile",
         "group": "build"
@@ -103,6 +103,7 @@
         "command": "dotnet",
         "args": [
           "build",
+          "-p:InnerTargets=CopyFilesForDebugging",
           "-p:GenerateFullPaths=true",
           "${workspaceFolder}/src/NuGet/Microsoft.Net.Compilers.Toolset/AnyCpu/Microsoft.Net.Compilers.Toolset.Package.csproj"
         ],
@@ -131,8 +132,9 @@
         "command": "dotnet",
         "type": "shell",
         "args": [
-          "pwsh",
-          "${workspaceFolder}/eng/generate-compiler-code.ps1"
+          "run",
+          "--file",
+          "${workspaceFolder}/eng/generate-compiler-code.cs"
         ],
         "problemMatcher": "$msCompile",
         "group": "build"

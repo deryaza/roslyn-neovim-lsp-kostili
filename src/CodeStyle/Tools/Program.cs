@@ -66,12 +66,12 @@ public static class Program
         }
 
         var configDir = Path.Combine(outputDir, "config");
-        foreach (var analysisMode in Enum.GetValues(typeof(AnalysisMode)))
+        foreach (var analysisMode in Enum.GetValues<AnalysisMode>())
         {
             CreateGlobalconfig(
                 configDir,
                 $"AnalysisLevelStyle_{analysisMode}.globalconfig".ToLowerInvariant(),
-                (AnalysisMode)analysisMode!,
+                analysisMode,
                 allRulesById);
         }
 
@@ -147,6 +147,10 @@ public static class Program
 
                         result.AppendLine();
                         result.AppendLine($"# {rule.Id}: {rule.Title}");
+                        if (rule.HelpLinkUri is not null)
+                        {
+                            result.AppendLine($"# {rule.HelpLinkUri}");
+                        }
                         result.AppendLine($"dotnet_diagnostic.{rule.Id}.severity = {severityString}");
                         return true;
                     }
@@ -197,13 +201,10 @@ public static class Program
 
     private static void CreateTargetsFile(string language, string outputDir, string targetsFileName)
     {
-        var fileContents =
-$@"<Project>{GetTargetContents(language)}
-</Project>";
-
         var directory = Directory.CreateDirectory(outputDir);
         var fileWithPath = Path.Combine(directory.FullName, targetsFileName);
-        File.WriteAllText(fileWithPath, fileContents);
+        File.WriteAllText(fileWithPath, $@"<Project>{GetTargetContents(language)}
+</Project>");
         return;
 
         static string GetTargetContents(string language)
@@ -258,9 +259,9 @@ $@"<Project>{GetTargetContents(language)}
                       <_GlobalAnalyzerConfigFile_MicrosoftCodeAnalysis{language}CodeStyle Condition="'$(_GlobalAnalyzerConfigFileName_MicrosoftCodeAnalysis{language}CodeStyle)' != ''">$(_GlobalAnalyzerConfigDir_MicrosoftCodeAnalysis{language}CodeStyle)\$(_GlobalAnalyzerConfigFileName_MicrosoftCodeAnalysis{language}CodeStyle)</_GlobalAnalyzerConfigFile_MicrosoftCodeAnalysis{language}CodeStyle>
                     </PropertyGroup>
 
-                    <!-- From .NET 10, the global config is systematically added if the file exists. Please check https://github.com/dotnet/roslyn/pull/71173 for more info. -->
+                    <!-- From .NET 11, the global config is systematically added if the file exists. Please check https://github.com/dotnet/roslyn/pull/71173 for more info. -->
                     <ItemGroup Condition="Exists('$(_GlobalAnalyzerConfigFile_MicrosoftCodeAnalysis{language}CodeStyle)') and
-                                           ('$(AnalysisLevelStyle)' != '$(AnalysisLevel)' or '$(AnalysisModeStyle)' != '$(AnalysisMode)' or ('$(EffectiveAnalysisLevelStyle)' != '' and $([MSBuild]::VersionGreaterThanOrEquals('$(EffectiveAnalysisLevelStyle)', '10.0'))))">
+                                           ('$(AnalysisLevelStyle)' != '$(AnalysisLevel)' or '$(AnalysisModeStyle)' != '$(AnalysisMode)' or ('$(EffectiveAnalysisLevelStyle)' != '' and $([MSBuild]::VersionGreaterThanOrEquals('$(EffectiveAnalysisLevelStyle)', '11.0'))))">
                       <EditorConfigFiles Include="$(_GlobalAnalyzerConfigFile_MicrosoftCodeAnalysis{language}CodeStyle)" />
                     </ItemGroup>
 

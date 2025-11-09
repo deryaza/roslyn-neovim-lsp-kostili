@@ -9,6 +9,7 @@ using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis.LanguageServer;
 
 namespace Roslyn.LanguageServer.Protocol;
+
 internal sealed class TextDocumentSyncConverter : JsonConverter<TextDocumentSyncOptions>
 {
     public override TextDocumentSyncOptions Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -30,12 +31,12 @@ internal sealed class TextDocumentSyncConverter : JsonConverter<TextDocumentSync
         }
         else if (reader.TokenType == JsonTokenType.String)
         {
-            var value = reader.GetString()!;
-            return JsonSerializer.Deserialize<TextDocumentSyncOptions>(value)!;
+            var value = reader.GetString();
+            return JsonSerializer.Deserialize<TextDocumentSyncOptions>(value);
         }
         else if (reader.TokenType == JsonTokenType.StartObject)
         {
-            return JsonSerializer.Deserialize<TextDocumentSyncOptions>(ref reader, options)!;
+            return JsonSerializer.Deserialize<TextDocumentSyncOptions>(ref reader, options);
         }
 
         throw new JsonException(string.Format(CultureInfo.InvariantCulture, LanguageServerProtocolResources.TextDocumentSyncSerializationError, reader.GetString()));

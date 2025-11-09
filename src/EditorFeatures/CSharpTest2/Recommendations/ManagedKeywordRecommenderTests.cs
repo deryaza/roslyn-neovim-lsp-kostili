@@ -4,6 +4,7 @@
 
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Test.Utilities;
+using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Recommendations;
@@ -12,24 +13,33 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Recommendations;
 public sealed class ManagedKeywordRecommenderTests : KeywordRecommenderTests
 {
     [Fact]
-    public async Task TestInFunctionPointerDeclaration()
-    {
-        await VerifyKeywordAsync(
+    public Task TestInFunctionPointerDeclaration()
+        => VerifyKeywordAsync(
             """
             class Test {
                 unsafe void N() {
                     delegate* $$
             """);
-    }
 
     [Fact]
-    public async Task TestInFunctionPointerDeclarationTouchingAsterisk()
-    {
-        await VerifyKeywordAsync(
+    public Task TestInFunctionPointerDeclarationTouchingAsterisk()
+        => VerifyKeywordAsync(
             """
             class Test {
                 unsafe void N() {
                     delegate*$$
             """);
-    }
+
+    [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/81015")]
+    public Task TestInCastExpressionAfterTyping()
+        => VerifyKeywordAsync(
+            """
+            class C
+            {
+                unsafe static void M()
+                {
+                    _ = (delegate*$$)&M;
+                }
+            }
+            """);
 }

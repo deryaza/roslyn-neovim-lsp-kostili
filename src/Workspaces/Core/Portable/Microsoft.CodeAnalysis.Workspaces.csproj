@@ -48,6 +48,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="AnalyzerRunner" />
     <InternalsVisibleTo Include="csi" />
+    <InternalsVisibleTo Include="Microsoft.CodeAnalysis.SemanticSearch.Extensions" />
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.CSharp.EditorFeatures" />
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.CSharp.EditorFeatures2.UnitTests" />
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.CSharp.Features" />
@@ -60,6 +61,8 @@
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.ExternalAccess.Apex" />
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.ExternalAccess.Debugger" />
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.ExternalAccess.UnitTesting" />
+    <InternalsVisibleTo Include="Microsoft.CodeAnalysis.ExternalAccess.HotReload" />
+    <InternalsVisibleTo Include="Microsoft.CodeAnalysis.ExternalAccess.HotReload.UnitTests" />
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.Features" />
     <InternalsVisibleTo Include="Microsoft.VisualStudio.LanguageServices.DevKit" />
     <RestrictedInternalsVisibleTo Include="Microsoft.CodeAnalysis.LiveUnitTesting.BuildManager" Partner="UnitTesting" Key="$(UnitTestingKey)" />

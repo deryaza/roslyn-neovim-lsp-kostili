@@ -3,13 +3,10 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.Immutable;
-using System.Security;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Features.Workspaces;
-using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.LanguageServer.HostWorkspace;
 using Microsoft.CodeAnalysis.LanguageServer.HostWorkspace.ProjectTelemetry;
-using Microsoft.CodeAnalysis.MetadataAsSource;
 using Microsoft.CodeAnalysis.MSBuild;
 using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.ProjectSystem;
@@ -19,24 +16,26 @@ using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.Workspaces.ProjectSystem;
 using Microsoft.CommonLanguageServerProtocol.Framework;
 using Microsoft.Extensions.Logging;
-using Microsoft.VisualStudio.Composition;
 using Roslyn.LanguageServer.Protocol;
-using Roslyn.Utilities;
 using static Microsoft.CodeAnalysis.MSBuild.BuildHostProcessManager;
 
 namespace Microsoft.CodeAnalysis.LanguageServer.FileBasedPrograms;
 
 /// <summary>Handles loading both miscellaneous files and file-based program projects.</summary>
-internal sealed class FileBasedProgramsProjectSystem : LanguageServerProjectLoader, ILspMiscellaneousFilesWorkspaceProvider
+internal sealed class FileBasedProgramsProjectSystem : LanguageServerProjectLoader, ILspMiscellaneousFilesWorkspaceProvider, IDisposable
 {
     private readonly ILspServices _lspServices;
     private readonly ILogger<FileBasedProgramsProjectSystem> _logger;
-    private readonly IMetadataAsSourceFileService _metadataAsSourceFileService;
     private readonly VirtualProjectXmlProvider _projectXmlProvider;
+    private readonly CanonicalMiscFilesProjectLoader _canonicalMiscFilesLoader;
+
+    public void Dispose()
+    {
+        _canonicalMiscFilesLoader.Dispose();
+    }
 
     public FileBasedProgramsProjectSystem(
         ILspServices lspServices,
-        IMetadataAsSourceFileService metadataAsSourceFileService,
         VirtualProjectXmlProvider projectXmlProvider,
         LanguageServerWorkspaceFactory workspaceFactory,
         IFileChangeWatcher fileChangeWatcher,
@@ -47,9 +46,7 @@ internal sealed class FileBasedProgramsProjectSystem : LanguageServerProjectLoad
         ServerConfigurationFactory serverConfigurationFactory,
         IBinLogPathProvider binLogPathProvider)
             : base(
-                workspaceFactory.FileBasedProgramsProjectFactory,
-                workspaceFactory.TargetFrameworkManager,
-                workspaceFactory.ProjectSystemHostInfo,
+                workspaceFactory,
                 fileChangeWatcher,
                 globalOptionService,
                 loggerFactory,
@@ -60,50 +57,74 @@ internal sealed class FileBasedProgramsProjectSystem : LanguageServerProjectLoad
     {
         _lspServices = lspServices;
         _logger = loggerFactory.CreateLogger<FileBasedProgramsProjectSystem>();
-        _metadataAsSourceFileService = metadataAsSourceFileService;
         _projectXmlProvider = projectXmlProvider;
+        _canonicalMiscFilesLoader = new CanonicalMiscFilesProjectLoader(
+                workspaceFactory,
+                fileChangeWatcher,
+                globalOptionService,
+                loggerFactory,
+                listenerProvider,
+                projectLoadTelemetry,
+                serverConfigurationFactory,
+                binLogPathProvider);
     }
 
-    public Workspace Workspace => ProjectFactory.Workspace;
-
     private string GetDocumentFilePath(DocumentUri uri) => uri.ParsedUri is { } parsedUri ? ProtocolConversions.GetDocumentFilePathFromUri(parsedUri) : uri.UriString;
+
+    public async ValueTask<bool> IsMiscellaneousFilesDocumentAsync(TextDocument document, CancellationToken cancellationToken)
+    {
+        // There are a few cases here:
+        //   1.  The document is a primordial document (either not loaded yet or doesn't support design time build) - it will be in the misc files workspace.
+        //   2.  The document is loaded as a canonical misc file - these are always in the misc files workspace.
+        //   3.  The document is loaded as a file based program - then it will be in the main workspace where the project path matches the source file path.
+        if (document.Project.Solution.Workspace == _workspaceFactory.MiscellaneousFilesWorkspaceProjectFactory.Workspace)
+            return true;
+
+        if (document.Project.FilePath is not null && await IsProjectLoadedAsync(document.Project.FilePath, cancellationToken))
+            return true;
+
+        return false;
+    }
 
     public async ValueTask<TextDocument?> AddMiscellaneousDocumentAsync(DocumentUri uri, SourceText documentText, string languageId, ILspLogger logger)
     {
         var documentFilePath = GetDocumentFilePath(uri);
-
-        // https://github.com/dotnet/roslyn/issues/78421: MetadataAsSource should be its own workspace
-        if (_metadataAsSourceFileService.TryAddDocumentToWorkspace(documentFilePath, documentText.Container, out var documentId))
+        var languageInfoProvider = _lspServices.GetRequiredService<ILanguageInfoProvider>();
+        if (!languageInfoProvider.TryGetLanguageInformation(uri, languageId, out var languageInformation))
         {
-            var metadataWorkspace = _metadataAsSourceFileService.TryGetWorkspace();
-            Contract.ThrowIfNull(metadataWorkspace);
-            return metadataWorkspace.CurrentSolution.GetRequiredDocument(documentId);
+            Contract.Fail($"Could not find language information for {uri} with absolute path {documentFilePath}");
         }
 
+        var supportsDesignTimeBuild = languageInformation.LanguageName == LanguageNames.CSharp
+            && GlobalOptionService.GetOption(LanguageServerProjectSystemOptionsStorage.EnableFileBasedPrograms);
+
+        // Check if this is a C# file that should use the canonical misc files loader
+        if (supportsDesignTimeBuild)
+        {
+            // For virtual (non-file) URIs or non-file-based programs, use the canonical loader
+            if (uri.ParsedUri is null || !uri.ParsedUri.IsFile || !VirtualProjectXmlProvider.IsFileBasedProgram(documentFilePath, documentText))
+            {
+                return await _canonicalMiscFilesLoader.AddMiscellaneousDocumentAsync(documentFilePath, documentText, CancellationToken.None);
+            }
+        }
+
+        // Use the original file-based programs logic
         var primordialDoc = AddPrimordialDocument(uri, documentText, languageId);
         Contract.ThrowIfNull(primordialDoc.FilePath);
 
-        var doDesignTimeBuild = uri.ParsedUri?.IsFile is true
-            && primordialDoc.Project.Language == LanguageNames.CSharp
-            && GlobalOptionService.GetOption(LanguageServerProjectSystemOptionsStorage.EnableFileBasedPrograms);
-        await BeginLoadingProjectWithPrimordialAsync(primordialDoc.FilePath, primordialProjectId: primordialDoc.Project.Id, doDesignTimeBuild);
+        var doDesignTimeBuild = uri.ParsedUri?.IsFile is true && supportsDesignTimeBuild;
+        await BeginLoadingProjectWithPrimordialAsync(primordialDoc.FilePath, _workspaceFactory.MiscellaneousFilesWorkspaceProjectFactory, primordialProjectId: primordialDoc.Project.Id, doDesignTimeBuild);
 
         return primordialDoc;
 
         TextDocument AddPrimordialDocument(DocumentUri uri, SourceText documentText, string languageId)
         {
-            var languageInfoProvider = _lspServices.GetRequiredService<ILanguageInfoProvider>();
-            if (!languageInfoProvider.TryGetLanguageInformation(uri, languageId, out var languageInformation))
-            {
-                Contract.Fail($"Could not find language information for {uri} with absolute path {documentFilePath}");
-            }
-
-            var workspace = Workspace;
+            var workspace = _workspaceFactory.MiscellaneousFilesWorkspaceProjectFactory.Workspace;
             var sourceTextLoader = new SourceTextLoader(documentText, documentFilePath);
             var projectInfo = MiscellaneousFileUtilities.CreateMiscellaneousProjectInfoForDocument(
                 workspace, documentFilePath, sourceTextLoader, languageInformation, documentText.ChecksumAlgorithm, workspace.Services.SolutionServices, []);
 
-            ProjectFactory.ApplyChangeToWorkspace(workspace => workspace.OnProjectAdded(projectInfo));
+            _workspaceFactory.MiscellaneousFilesWorkspaceProjectFactory.ApplyChangeToWorkspace(workspace => workspace.OnProjectAdded(projectInfo));
 
             // https://github.com/dotnet/roslyn/pull/78267
             // Work around an issue where opening a Razor file in the misc workspace causes a crash.
@@ -118,21 +139,22 @@ internal sealed class FileBasedProgramsProjectSystem : LanguageServerProjectLoad
         }
     }
 
-    public async ValueTask TryRemoveMiscellaneousDocumentAsync(DocumentUri uri, bool removeFromMetadataWorkspace)
+    public async ValueTask<bool> TryRemoveMiscellaneousDocumentAsync(DocumentUri uri)
     {
         var documentPath = GetDocumentFilePath(uri);
-        if (removeFromMetadataWorkspace && _metadataAsSourceFileService.TryRemoveDocumentFromWorkspace(documentPath))
-        {
-            return;
-        }
+        // First try to remove from the canonical misc files loader if it was created
+        var removedFromCanonical = await _canonicalMiscFilesLoader.TryRemoveMiscellaneousDocumentAsync(documentPath, CancellationToken.None);
+        if (removedFromCanonical)
+            return true;
 
-        await UnloadProjectAsync(documentPath);
+        // Fall back to the file-based programs logic
+        return await TryUnloadProjectAsync(documentPath);
     }
 
     protected override async Task<RemoteProjectLoadResult?> TryLoadProjectInMSBuildHostAsync(
         BuildHostProcessManager buildHostProcessManager, string documentPath, CancellationToken cancellationToken)
     {
-        var content = await _projectXmlProvider.GetVirtualProjectContentAsync(documentPath, cancellationToken);
+        var content = await _projectXmlProvider.GetVirtualProjectContentAsync(documentPath, _logger, cancellationToken);
         if (content is not var (virtualProjectContent, diagnostics))
         {
             // https://github.com/dotnet/roslyn/issues/78618: falling back to this until dotnet run-api is more widely available
@@ -143,7 +165,6 @@ internal sealed class FileBasedProgramsProjectSystem : LanguageServerProjectLoad
 
         foreach (var diagnostic in diagnostics)
         {
-            // https://github.com/dotnet/roslyn/issues/78688: Surface diagnostics in editor
             _logger.LogError($"{diagnostic.Location.Path}{diagnostic.Location.Span.Start}: {diagnostic.Message}");
         }
 
@@ -151,13 +172,40 @@ internal sealed class FileBasedProgramsProjectSystem : LanguageServerProjectLoad
         // This is necessary in order to get msbuild to apply the standard c# props/targets to the project.
         var virtualProjectPath = VirtualProjectXmlProvider.GetVirtualProjectPath(documentPath);
 
-        var loader = ProjectFactory.CreateFileTextLoader(documentPath);
+        var loader = _workspaceFactory.MiscellaneousFilesWorkspaceProjectFactory.CreateFileTextLoader(documentPath);
         var textAndVersion = await loader.LoadTextAsync(new LoadTextOptions(SourceHashAlgorithms.Default), cancellationToken);
         var isFileBasedProgram = VirtualProjectXmlProvider.IsFileBasedProgram(documentPath, textAndVersion.Text);
 
         const BuildHostProcessKind buildHostKind = BuildHostProcessKind.NetCore;
-        var buildHost = await buildHostProcessManager.GetBuildHostAsync(buildHostKind, cancellationToken);
+        var buildHost = await buildHostProcessManager.GetBuildHostAsync(buildHostKind, virtualProjectPath, dotnetPath: null, cancellationToken);
         var loadedFile = await buildHost.LoadProjectAsync(virtualProjectPath, virtualProjectContent, languageName: LanguageNames.CSharp, cancellationToken);
-        return new RemoteProjectLoadResult(loadedFile, HasAllInformation: isFileBasedProgram, Preferred: buildHostKind, Actual: buildHostKind);
+
+        return new RemoteProjectLoadResult
+        {
+            ProjectFile = loadedFile,
+            // If it's a proper file based program, we'll put it in the main host workspace factory since we want cross-project references to work.
+            // Otherwise, we'll keep it in miscellaneous files.
+            ProjectFactory = isFileBasedProgram ? _workspaceFactory.HostProjectFactory : _workspaceFactory.MiscellaneousFilesWorkspaceProjectFactory,
+            IsFileBasedProgram = isFileBasedProgram,
+            IsMiscellaneousFile = !isFileBasedProgram,
+            PreferredBuildHostKind = buildHostKind,
+            ActualBuildHostKind = buildHostKind,
+        };
+    }
+
+    protected override ValueTask OnProjectUnloadedAsync(string projectFilePath)
+    {
+        return ValueTask.CompletedTask;
+    }
+
+    protected override async ValueTask TransitionPrimordialProjectToLoadedAsync(
+        string projectPath,
+        ProjectSystemProjectFactory primordialProjectFactory,
+        ProjectId primordialProjectId,
+        CancellationToken cancellationToken)
+    {
+        await primordialProjectFactory.ApplyChangeToWorkspaceAsync(
+            workspace => workspace.OnProjectRemoved(primordialProjectId),
+            cancellationToken);
     }
 }

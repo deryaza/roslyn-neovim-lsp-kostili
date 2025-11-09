@@ -258,13 +258,13 @@ namespace Microsoft.CodeAnalysis.CSharp
                 resolution = binder.ResolveMethodGroup(source, analyzedArguments, useSiteInfo: ref useSiteInfo,
                     options: OverloadResolution.Options.InferWithDynamic | OverloadResolution.Options.IsMethodGroupConversion |
                              (isFunctionPointer ? OverloadResolution.Options.IsFunctionPointerResolution : OverloadResolution.Options.None),
-                    returnRefKind: delegateInvokeMethodOpt.RefKind, returnType: delegateInvokeMethodOpt.ReturnType,
+                    acceptOnlyMethods: true, returnRefKind: delegateInvokeMethodOpt.RefKind, returnType: delegateInvokeMethodOpt.ReturnType,
                     callingConventionInfo: callingConventionInfo);
                 analyzedArguments.Free();
             }
             else
             {
-                resolution = binder.ResolveMethodGroup(source, analyzedArguments: null, ref useSiteInfo, options: OverloadResolution.Options.IsMethodGroupConversion);
+                resolution = binder.ResolveMethodGroup(source, analyzedArguments: null, useSiteInfo: ref useSiteInfo, options: OverloadResolution.Options.IsMethodGroupConversion, acceptOnlyMethods: true);
             }
 
             Debug.Assert(!resolution.IsNonMethodExtensionMember(out _));
@@ -330,7 +330,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         Debug.Assert((object)method != null);
                         if (resolution.MethodGroup.IsExtensionMethodGroup)
                         {
-                            Debug.Assert(method.IsExtensionMethod || method.GetIsNewExtensionMember());
+                            Debug.Assert(method.IsExtensionMethod || method.IsExtensionBlockMember());
 
                             ParameterSymbol thisParameter;
 
@@ -470,7 +470,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if (methodGroup.IsExtensionMethodGroup)
             {
-                if (!(method.GetIsNewExtensionMember() && method.IsStatic) && !Binder.GetReceiverParameter(method).Type.IsReferenceType)
+                if (!(method.IsExtensionBlockMember() && method.IsStatic) && !Binder.GetReceiverParameter(method).Type.IsReferenceType)
                 {
                     return Conversion.NoConversion;
                 }
@@ -498,7 +498,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             // NOTE: Delegate type compatibility is important, but is not part of the existence check.
 
-            bool isExtensionMethod = methodGroup.IsExtensionMethodGroup && !method.GetIsNewExtensionMember();
+            bool isExtensionMethod = methodGroup.IsExtensionMethodGroup && !method.IsExtensionBlockMember();
             Debug.Assert(method.ParameterCount == parameterCount + (isExtensionMethod ? 1 : 0));
 
             return new Conversion(ConversionKind.MethodGroup, method, isExtensionMethod: isExtensionMethod);

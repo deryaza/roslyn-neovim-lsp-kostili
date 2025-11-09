@@ -34,6 +34,9 @@ public sealed class RemoteEditAndContinueServiceTests
             (!string.IsNullOrWhiteSpace(d.DataLocation.UnmappedFileSpan.Path) ? $" {d.DataLocation.UnmappedFileSpan.Path}({d.DataLocation.UnmappedFileSpan.StartLinePosition.Line}, {d.DataLocation.UnmappedFileSpan.StartLinePosition.Character}, {d.DataLocation.UnmappedFileSpan.EndLinePosition.Line}, {d.DataLocation.UnmappedFileSpan.EndLinePosition.Character}):" : "") +
             $" {d.Message}";
 
+    private static IEnumerable<string> Inspect(ImmutableDictionary<ProjectId, ImmutableArray<ProjectId>> projects)
+        => projects.Select(kvp => $"{kvp.Key}: [{string.Join(", ", kvp.Value.Select(p => p.ToString()))}]");
+
     [Theory, CombinatorialData]
     public async Task Proxy(TestHost testHost)
     {
@@ -126,11 +129,9 @@ public sealed class RemoteEditAndContinueServiceTests
 
         IManagedHotReloadService? remoteDebuggeeModuleMetadataProvider = null;
 
-        var debuggingSession = mockEncService.StartDebuggingSessionImpl = (solution, debuggerService, sourceTextProvider, captureMatchingDocuments, captureAllMatchingDocuments, reportDiagnostics) =>
+        var debuggingSession = mockEncService.StartDebuggingSessionImpl = (solution, debuggerService, sourceTextProvider, reportDiagnostics) =>
         {
             Assert.Equal("proj", solution.GetRequiredProject(projectId).Name);
-            AssertEx.Equal(new[] { documentId }, captureMatchingDocuments);
-            Assert.False(captureAllMatchingDocuments);
             Assert.True(reportDiagnostics);
 
             remoteDebuggeeModuleMetadataProvider = debuggerService;
@@ -145,16 +146,14 @@ public sealed class RemoteEditAndContinueServiceTests
                 GetActiveStatementsImpl = () => [as1]
             },
             sourceTextProvider: NullPdbMatchingSourceTextProvider.Instance,
-            captureMatchingDocuments: [documentId],
-            captureAllMatchingDocuments: false,
             reportDiagnostics: true,
-            CancellationToken.None);
+            cancellationToken: CancellationToken.None);
 
         Contract.ThrowIfNull(sessionProxy);
 
         // BreakStateChanged
 
-        mockEncService.BreakStateOrCapabilitiesChangedImpl = (bool? inBreakState) =>
+        mockEncService.BreakStateOrCapabilitiesChangedImpl = inBreakState =>
         {
             Assert.True(inBreakState);
         };
@@ -173,9 +172,9 @@ public sealed class RemoteEditAndContinueServiceTests
 
         var diagnosticDescriptor1 = EditAndContinueDiagnosticDescriptors.GetDescriptor(EditAndContinueErrorCode.ErrorReadingFile);
 
-        var runningProjects1 = new Dictionary<ProjectId, RunningProjectInfo>
+        var runningProjects1 = new Dictionary<ProjectId, RunningProjectOptions>
         {
-            { project.Id, new RunningProjectInfo() { RestartWhenChangesHaveNoEffect = true, AllowPartialUpdate = true} }
+            { project.Id, new RunningProjectOptions() { RestartWhenChangesHaveNoEffect = true } }
         }.ToImmutableDictionary();
 
         mockEncService.EmitSolutionUpdateImpl = (solution, runningProjects, activeStatementSpanProvider) =>
@@ -214,8 +213,9 @@ public sealed class RemoteEditAndContinueServiceTests
                 ModuleUpdates = updates,
                 Diagnostics = diagnostics,
                 SyntaxError = syntaxError,
-                ProjectsToRebuild = [project.Id],
-                ProjectsToRestart = ImmutableDictionary<ProjectId, ImmutableArray<ProjectId>>.Empty.Add(project.Id, []),
+                ProjectsToRebuild = [projectId],
+                ProjectsToRestart = ImmutableDictionary<ProjectId, ImmutableArray<ProjectId>>.Empty.Add(projectId, [projectId]),
+                ProjectsToRedeploy = [projectId]
             };
         };
 
@@ -241,6 +241,10 @@ public sealed class RemoteEditAndContinueServiceTests
         Assert.Equal(instructionId1.Method.Method, activeStatements.Method);
         Assert.Equal(instructionId1.ILOffset, activeStatements.ILOffset);
         Assert.Equal(span1, activeStatements.NewSpan.ToLinePositionSpan());
+
+        AssertEx.SequenceEqual([projectId], results.ProjectsToRebuild);
+        AssertEx.SequenceEqual([$"{projectId}: [{projectId}]"], Inspect(results.ProjectsToRestart));
+        AssertEx.SequenceEqual([projectId], results.ProjectsToRedeploy);
 
         // CommitSolutionUpdate
 

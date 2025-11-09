@@ -217,7 +217,9 @@ class Program
             Await TestAsync(workspace)
         End Function
 
-        <WpfFact, WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/900438")>
+        <WpfFact>
+        <WorkItem("http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/900438")>
+        <WorkItem("https://github.com/dotnet/roslyn/issues/77916")>
         Public Async Function TestCSharpGotoDefinitionPartialMethod() As Task
             Dim workspace =
 <Workspace>
@@ -225,7 +227,7 @@ class Program
         <Document>
             partial class Test
             {
-                partial void M();
+                partial void [|M|]();
             }
         </Document>
         <Document>
@@ -237,7 +239,7 @@ class Program
                     t.M$$();
                 }
 
-                partial void [|M|]()
+                partial void M()
                 {
                     throw new NotImplementedException();
                 }
@@ -249,7 +251,7 @@ class Program
             Await TestAsync(workspace)
         End Function
 
-        <WpfFact>
+        <WpfFact, WorkItem("https://github.com/dotnet/roslyn/issues/77916")>
         Public Async Function TestCSharpGotoDefinitionExtendedPartialMethod() As Task
             Dim workspace =
 <Workspace>
@@ -257,7 +259,7 @@ class Program
         <Document>
             partial class Test
             {
-                public partial void M();
+                public partial void [|M|]();
             }
         </Document>
         <Document>
@@ -269,7 +271,7 @@ class Program
                     t.M$$();
                 }
 
-                public partial void [|M|]()
+                public partial void M()
                 {
                     throw new NotImplementedException();
                 }
@@ -281,7 +283,7 @@ class Program
             Await TestAsync(workspace)
         End Function
 
-        <WpfFact>
+        <WpfFact, WorkItem("https://github.com/dotnet/roslyn/issues/77916")>
         Public Async Function TestCSharpGotoDefinitionPartialProperty() As Task
             Dim workspace =
 <Workspace>
@@ -289,7 +291,7 @@ class Program
         <Document>
             partial class Test
             {
-                public partial int Prop { get; set; }
+                public partial int [|Prop|] { get; set; }
             }
         </Document>
         <Document>
@@ -301,7 +303,7 @@ class Program
                     int i = t.Prop$$;
                 }
 
-                public partial void [|Prop|]
+                public partial void Prop
                 {
                     get => throw new NotImplementedException();
                     set => throw new NotImplementedException();
@@ -314,7 +316,7 @@ class Program
             Await TestAsync(workspace)
         End Function
 
-        <WpfFact>
+        <WpfFact, WorkItem("https://github.com/dotnet/roslyn/issues/77916")>
         Public Async Function TestCSharpGotoDefinitionPartialEvent() As Task
             Dim workspace =
 <Workspace>
@@ -322,7 +324,7 @@ class Program
         <Document>
             partial class Test
             {
-                public partial event System.Action E;
+                public partial event System.Action [|E|];
             }
         </Document>
         <Document>
@@ -334,7 +336,7 @@ class Program
                     int i = t.E$$;
                 }
 
-                public partial event System.Action [|E|]
+                public partial event System.Action E
                 {
                     add { }
                     remove { }
@@ -347,7 +349,7 @@ class Program
             Await TestAsync(workspace)
         End Function
 
-        <WpfFact>
+        <WpfFact, WorkItem("https://github.com/dotnet/roslyn/issues/77916")>
         Public Async Function TestCSharpGotoDefinitionPartialConstructor() As Task
             Dim workspace =
 <Workspace>
@@ -355,7 +357,7 @@ class Program
         <Document>
             partial class Test
             {
-                public partial Test();
+                public partial [|Test|]();
             }
         </Document>
         <Document>
@@ -366,7 +368,7 @@ class Program
                     var t = new Te$$st();
                 }
 
-                public partial [|Test|]()
+                public partial Test()
                 {
                 }
             }
@@ -4522,6 +4524,214 @@ public partial class Program
                 void M(string s)
                 {
                     var v = s.$$Goo;
+                }
+            }
+        </Document>
+    </Project>
+</Workspace>
+
+            Await TestAsync(workspace)
+        End Function
+
+        <WorkItem("https://github.com/dotnet/roslyn/issues/77545")>
+        <WpfFact>
+        Public Async Function TestCSharpGoToConstructorWithMismatchingArguments_ImplicitConversion1() As Task
+            Dim workspace =
+<Workspace>
+    <Project Language="C#" CommonReferences="true" LanguageVersion="preview">
+        <Document>
+            record [|R|](int I);
+
+            class C
+            {
+                public C Repro()
+                {
+                    M(new $$R(1u));
+                    return new R(1u);
+                }
+
+                public static void M(C c) { }
+                public static implicit operator C(R r) => throw null;
+            }
+        </Document>
+    </Project>
+</Workspace>
+
+            Await TestAsync(workspace)
+        End Function
+
+        <WorkItem("https://github.com/dotnet/roslyn/issues/77545")>
+        <WpfFact>
+        Public Async Function TestCSharpGoToConstructorWithMismatchingArguments_ImplicitConversion2() As Task
+            Dim workspace =
+<Workspace>
+    <Project Language="C#" CommonReferences="true" LanguageVersion="preview">
+        <Document>
+            record [|R|](int I)
+            {
+                public R(short s)
+                    : this((int)s) { }
+            }
+
+            class C
+            {
+                public C Repro()
+                {
+                    M(new $$R(1u));
+                    return new R(1u);
+                }
+
+                public static void M(C c) { }
+                public static implicit operator C(R r) => throw null;
+            }
+        </Document>
+    </Project>
+</Workspace>
+
+            Await TestAsync(workspace)
+        End Function
+
+        <WorkItem("https://github.com/dotnet/roslyn/issues/77545")>
+        <WpfFact>
+        Public Async Function TestCSharpGoToConstructorWithMismatchingArguments_ImplicitConversion3() As Task
+            Dim workspace =
+<Workspace>
+    <Project Language="C#" CommonReferences="true" LanguageVersion="preview">
+        <Document>
+            record [|R|];
+
+            class C
+            {
+                public C Repro()
+                {
+                    M(new $$R(1u));
+                    return new R(1u);
+                }
+
+                public static void M(C c) { }
+                public static implicit operator C(R r) => throw null;
+            }
+        </Document>
+    </Project>
+</Workspace>
+
+            Await TestAsync(workspace)
+        End Function
+
+        <WorkItem("https://github.com/dotnet/roslyn/issues/77545")>
+        <WpfFact>
+        Public Async Function TestCSharpGoToConstructorWithMismatchingArguments_ImplicitConversion4() As Task
+            Dim workspace =
+<Workspace>
+    <Project Language="C#" CommonReferences="true" LanguageVersion="preview">
+        <Document>
+            record R
+            {
+                public [|R|](int i) { }
+            }
+
+            class C
+            {
+                public C Repro()
+                {
+                    M(new $$R(1u));
+                    return new R(1u);
+                }
+
+                public static void M(C c) { }
+                public static implicit operator C(R r) => throw null;
+            }
+        </Document>
+    </Project>
+</Workspace>
+
+            Await TestAsync(workspace)
+        End Function
+
+        <WorkItem("https://github.com/dotnet/roslyn/issues/77545")>
+        <WpfFact>
+        Public Async Function TestCSharpGoToConstructorWithMismatchingArguments_ExplicitConversion() As Task
+            Dim workspace =
+<Workspace>
+    <Project Language="C#" CommonReferences="true" LanguageVersion="preview">
+        <Document>
+            record [|R|](int I)
+            {
+                public R(short s)
+                    : this((int)s) { }
+            }
+
+            class C
+            {
+                public C Repro()
+                {
+                    M((C)new $$R(1u));
+                    return new (C)R(1u);
+                }
+
+                public static void M(C c) { }
+                public static explicit operator C(R r) => throw null;
+            }
+        </Document>
+    </Project>
+</Workspace>
+
+            Await TestAsync(workspace)
+        End Function
+
+        <WorkItem("https://github.com/dotnet/roslyn/issues/73498")>
+        <WpfFact>
+        Public Async Function TestCSharpGoToClassMissingConstructor_ImplicitConversion() As Task
+            Dim workspace =
+<Workspace>
+    <Project Language="C#" CommonReferences="true" LanguageVersion="preview">
+        <Document>
+            public abstract class BaseThing;
+            public sealed class [|DerivedThing|] : BaseThing;
+
+            public struct Convertible
+            {
+                public static implicit operator Convertible(BaseThing thing) => new();
+            }
+
+            class C
+            {
+                void UseConvertible(Convertible convertible) { }
+
+                void CreateUseConvertible()
+                {
+                    UseConvertible(new $$DerivedThing(1, 2));
+                }
+            }
+        </Document>
+    </Project>
+</Workspace>
+
+            Await TestAsync(workspace)
+        End Function
+
+        <WorkItem("https://github.com/dotnet/roslyn/issues/73498")>
+        <WpfFact>
+        Public Async Function TestCSharpGoToClassMissingConstructor_ExplicitConversion() As Task
+            Dim workspace =
+<Workspace>
+    <Project Language="C#" CommonReferences="true" LanguageVersion="preview">
+        <Document>
+            public abstract class BaseThing;
+            public sealed class [|DerivedThing|] : BaseThing;
+
+            public struct Convertible
+            {
+                public static explicit operator Convertible(BaseThing thing) => new();
+            }
+
+            class C
+            {
+                void UseConvertible(Convertible convertible) { }
+
+                void CreateUseConvertible()
+                {
+                    UseConvertible((Convertible)new $$DerivedThing(1, 2));
                 }
             }
         </Document>

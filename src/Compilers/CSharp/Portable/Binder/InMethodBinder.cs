@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Roslyn.Utilities;
@@ -332,7 +333,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             var parameters = _methodSymbol.Parameters;
             var typeParameters = _methodSymbol.TypeParameters;
 
-            if (_methodSymbol.GetIsNewExtensionMember())
+            if (_methodSymbol.IsExtensionBlockMember())
             {
                 typeParameters = _methodSymbol.ContainingType.TypeParameters.Concat(typeParameters);
 

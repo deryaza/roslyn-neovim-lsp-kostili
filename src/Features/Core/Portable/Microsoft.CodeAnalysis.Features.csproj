@@ -18,7 +18,6 @@
     <ProjectReference Include="..\..\..\Compilers\Core\Portable\Microsoft.CodeAnalysis.csproj" />
     <ProjectReference Include="..\..\..\Scripting\Core\Microsoft.CodeAnalysis.Scripting.csproj" Aliases="Scripting,global" />
     <ProjectReference Include="..\..\..\Workspaces\Core\Portable\Microsoft.CodeAnalysis.Workspaces.csproj" />
-    <ProjectReference Include="..\..\..\RoslynAnalyzers\Microsoft.CodeAnalysis.AnalyzerUtilities\Microsoft.CodeAnalysis.AnalyzerUtilities.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AnalyzerRunner" />
@@ -54,6 +53,8 @@
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.ExternalAccess.VisualDiagnostics" />
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.ExternalAccess.Xaml" />
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.ExternalAccess.EditorConfigGenerator" />
+    <InternalsVisibleTo Include="Microsoft.CodeAnalysis.ExternalAccess.HotReload" />
+    <InternalsVisibleTo Include="Microsoft.CodeAnalysis.ExternalAccess.HotReload.UnitTests" />
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.Features.DiagnosticsTests.Utilities" />
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.Features.Test.Utilities" />
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.Features.UnitTests" />
@@ -106,7 +107,6 @@
     <InternalsVisibleTo Include="VBCSCompiler" />
     <InternalsVisibleTo Include="AITools.CodeAnalysis" Key="$(AIToolsKey)" />
 
-    <RestrictedInternalsVisibleTo Include="dotnet-watch" Partner="Watch" Key="$(AspNetCoreKey)" />
     <RestrictedInternalsVisibleTo Include="Microsoft.CodeAnalysis.LiveUnitTesting.Orchestrator" Partner="UnitTesting" Key="$(UnitTestingKey)" />
     <RestrictedInternalsVisibleTo Include="Microsoft.CodeAnalysis.UnitTesting.SourceBasedTestDiscovery" Partner="UnitTesting" Key="$(UnitTestingKey)" />
     <RestrictedInternalsVisibleTo Include="Microsoft.CodeAnalysis.UnitTesting.SourceBasedTestDiscovery.Core" Partner="UnitTesting" Key="$(UnitTestingKey)" />

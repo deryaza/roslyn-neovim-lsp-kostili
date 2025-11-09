@@ -15,7 +15,6 @@ using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.LanguageService;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Simplification;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.PopulateSwitch;
 
@@ -23,17 +22,14 @@ internal abstract class AbstractPopulateSwitchCodeFixProvider<
     TSwitchOperation,
     TSwitchSyntax,
     TSwitchArmSyntax,
-    TMemberAccessExpression>
+    TMemberAccessExpression>(string diagnosticId)
     : SyntaxEditorBasedCodeFixProvider
     where TSwitchOperation : IOperation
     where TSwitchSyntax : SyntaxNode
     where TSwitchArmSyntax : SyntaxNode
     where TMemberAccessExpression : SyntaxNode
 {
-    public sealed override ImmutableArray<string> FixableDiagnosticIds { get; }
-
-    protected AbstractPopulateSwitchCodeFixProvider(string diagnosticId)
-        => FixableDiagnosticIds = [diagnosticId];
+    public sealed override ImmutableArray<string> FixableDiagnosticIds { get; } = [diagnosticId];
 
     protected abstract ITypeSymbol GetSwitchType(TSwitchOperation switchStatement);
     protected abstract ICollection<ISymbol> GetMissingEnumMembers(TSwitchOperation switchOperation);

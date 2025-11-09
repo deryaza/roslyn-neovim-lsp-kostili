@@ -44,8 +44,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         public abstract override bool IsStatic { get; }
 
-        internal override bool TryGetThisParameter(out ParameterSymbol thisParameter)
+#nullable enable
+
+        internal override bool TryGetThisParameter(out ParameterSymbol? thisParameter)
         {
+            Debug.Assert(!this.IsExtensionBlockMember());
+
             if (IsStatic)
             {
                 thisParameter = null;
@@ -61,6 +65,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             return true;
         }
 
+#nullable disable
+
         /// <summary>
         /// Returns data decoded from Obsolete attribute or null if there is no Obsolete attribute.
         /// This property returns ObsoleteAttributeData.Uninitialized if attribute arguments haven't been decoded yet.
@@ -71,6 +77,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         }
 
         internal sealed override UnmanagedCallersOnlyAttributeData GetUnmanagedCallersOnlyAttributeData(bool forceComplete) => null;
+
+        internal sealed override bool HasSpecialNameAttribute => throw ExceptionUtilities.Unreachable();
 
         internal override int CalculateLocalSyntaxOffset(int localPosition, SyntaxTree localTree)
         {

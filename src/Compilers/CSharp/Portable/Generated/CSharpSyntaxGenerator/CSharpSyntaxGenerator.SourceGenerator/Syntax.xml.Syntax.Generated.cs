@@ -6150,6 +6150,7 @@ public sealed partial class InterpolationFormatClauseSyntax : CSharpSyntaxNode
     public InterpolationFormatClauseSyntax WithFormatStringToken(SyntaxToken formatStringToken) => Update(this.ColonToken, formatStringToken);
 }
 
+/// <summary>Represents a global statement in a compilation unit. Each statement at the top level of a compilation unit is wrapped in a GlobalStatementSyntax node. Global statements are top-level statements that can appear in a C# program or script. In regular C# programs (C# 9.0+), they are synthesized into a Main method. In C# scripts, they are executed as top-level code.</summary>
 /// <remarks>
 /// <para>This node is associated with the following syntax kinds:</para>
 /// <list type="bullet">
@@ -13766,7 +13767,10 @@ public sealed partial class ParameterSyntax : BaseParameterSyntax
     internal ParameterSyntax(InternalSyntax.CSharpSyntaxNode green, SyntaxNode? parent, int position)
       : base(green, parent, position)
     {
+        Validate();
     }
+
+    private partial void Validate();
 
     /// <summary>Gets the attribute declaration list.</summary>
     public override SyntaxList<AttributeListSyntax> AttributeLists => new SyntaxList<AttributeListSyntax>(GetRed(ref this.attributeLists, 0));
@@ -14286,6 +14290,80 @@ public sealed partial class NameMemberCrefSyntax : MemberCrefSyntax
         var parameters = this.Parameters ?? SyntaxFactory.CrefParameterList();
         return WithParameters(parameters.WithParameters(parameters.Parameters.AddRange(items)));
     }
+}
+
+/// <remarks>
+/// <para>This node is associated with the following syntax kinds:</para>
+/// <list type="bullet">
+/// <item><description><see cref="SyntaxKind.ExtensionMemberCref"/></description></item>
+/// </list>
+/// </remarks>
+public sealed partial class ExtensionMemberCrefSyntax : MemberCrefSyntax
+{
+    private TypeArgumentListSyntax? typeArgumentList;
+    private CrefParameterListSyntax? parameters;
+    private MemberCrefSyntax? member;
+
+    internal ExtensionMemberCrefSyntax(InternalSyntax.CSharpSyntaxNode green, SyntaxNode? parent, int position)
+      : base(green, parent, position)
+    {
+    }
+
+    public SyntaxToken ExtensionKeyword => new SyntaxToken(this, ((InternalSyntax.ExtensionMemberCrefSyntax)this.Green).extensionKeyword, Position, 0);
+
+    public TypeArgumentListSyntax? TypeArgumentList => GetRed(ref this.typeArgumentList, 1);
+
+    public CrefParameterListSyntax Parameters => GetRed(ref this.parameters, 2)!;
+
+    public SyntaxToken DotToken => new SyntaxToken(this, ((InternalSyntax.ExtensionMemberCrefSyntax)this.Green).dotToken, GetChildPosition(3), GetChildIndex(3));
+
+    public MemberCrefSyntax Member => GetRed(ref this.member, 4)!;
+
+    internal override SyntaxNode? GetNodeSlot(int index)
+        => index switch
+        {
+            1 => GetRed(ref this.typeArgumentList, 1),
+            2 => GetRed(ref this.parameters, 2)!,
+            4 => GetRed(ref this.member, 4)!,
+            _ => null,
+        };
+
+    internal override SyntaxNode? GetCachedSlot(int index)
+        => index switch
+        {
+            1 => this.typeArgumentList,
+            2 => this.parameters,
+            4 => this.member,
+            _ => null,
+        };
+
+    public override void Accept(CSharpSyntaxVisitor visitor) => visitor.VisitExtensionMemberCref(this);
+    public override TResult? Accept<TResult>(CSharpSyntaxVisitor<TResult> visitor) where TResult : default => visitor.VisitExtensionMemberCref(this);
+
+    public ExtensionMemberCrefSyntax Update(SyntaxToken extensionKeyword, TypeArgumentListSyntax? typeArgumentList, CrefParameterListSyntax parameters, SyntaxToken dotToken, MemberCrefSyntax member)
+    {
+        if (extensionKeyword != this.ExtensionKeyword || typeArgumentList != this.TypeArgumentList || parameters != this.Parameters || dotToken != this.DotToken || member != this.Member)
+        {
+            var newNode = SyntaxFactory.ExtensionMemberCref(extensionKeyword, typeArgumentList, parameters, dotToken, member);
+            var annotations = GetAnnotations();
+            return annotations?.Length > 0 ? newNode.WithAnnotations(annotations) : newNode;
+        }
+
+        return this;
+    }
+
+    public ExtensionMemberCrefSyntax WithExtensionKeyword(SyntaxToken extensionKeyword) => Update(extensionKeyword, this.TypeArgumentList, this.Parameters, this.DotToken, this.Member);
+    public ExtensionMemberCrefSyntax WithTypeArgumentList(TypeArgumentListSyntax? typeArgumentList) => Update(this.ExtensionKeyword, typeArgumentList, this.Parameters, this.DotToken, this.Member);
+    public ExtensionMemberCrefSyntax WithParameters(CrefParameterListSyntax parameters) => Update(this.ExtensionKeyword, this.TypeArgumentList, parameters, this.DotToken, this.Member);
+    public ExtensionMemberCrefSyntax WithDotToken(SyntaxToken dotToken) => Update(this.ExtensionKeyword, this.TypeArgumentList, this.Parameters, dotToken, this.Member);
+    public ExtensionMemberCrefSyntax WithMember(MemberCrefSyntax member) => Update(this.ExtensionKeyword, this.TypeArgumentList, this.Parameters, this.DotToken, member);
+
+    public ExtensionMemberCrefSyntax AddTypeArgumentListArguments(params TypeSyntax[] items)
+    {
+        var typeArgumentList = this.TypeArgumentList ?? SyntaxFactory.TypeArgumentList();
+        return WithTypeArgumentList(typeArgumentList.WithArguments(typeArgumentList.Arguments.AddRange(items)));
+    }
+    public ExtensionMemberCrefSyntax AddParametersParameters(params CrefParameterSyntax[] items) => WithParameters(this.Parameters.WithParameters(this.Parameters.Parameters.AddRange(items)));
 }
 
 /// <summary>

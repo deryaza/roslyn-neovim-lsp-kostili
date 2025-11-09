@@ -450,6 +450,16 @@ Ujistěte se, že specifikátor tt použijete pro jazyky, pro které je nezbytn�
         <target state="translated">Změna typů parametrů u {0} vyžaduje restartování aplikace.</target>
         <note />
       </trans-unit>
+      <trans-unit id="Changing_project_or_package_reference_caused_the_identity_of_referenced_assembly_to_change_from_0_to_1_which_requires_restarting_the_application">
+        <source>Changing project or package reference caused the identity of referenced assembly to change from '{0}' to '{1}', which requires restarting the application.</source>
+        <target state="new">Changing project or package reference caused the identity of referenced assembly to change from '{0}' to '{1}', which requires restarting the application.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="Changing_project_setting_0_from_1_to_2_requires_restarting_the_application">
+        <source>Changing project setting '{0}' from '{1}' to '{2}' requires restarting the application.</source>
+        <target state="new">Changing project setting '{0}' from '{1}' to '{2}' requires restarting the application.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="Changing_pseudo_custom_attribute_0_of_1_requires_restarting_th_application">
         <source>Changing pseudo-custom attribute '{0}' of {1} requires restarting the application</source>
         <target state="translated">Změna pseudovlastního atributu {0} u {1} vyžaduje restartování aplikace.</target>
@@ -1120,11 +1130,6 @@ Ujistěte se, že specifikátor tt použijete pro jazyky, pro které je nezbytn�
         <target state="translated">Metoda {0} musí vrátit stream, který podporuje operace čtení a hledání.</target>
         <note />
       </trans-unit>
-      <trans-unit id="Method_0_must_be_static_and_non_generic">
-        <source>Method '{0}' must be static and non-generic</source>
-        <target state="translated">Metoda {0} musí být statická a neobecná.</target>
-        <note />
-      </trans-unit>
       <trans-unit id="Miscellaneous_Files">
         <source>Miscellaneous Files</source>
         <target state="translated">Různé soubory</target>
@@ -1335,11 +1340,6 @@ Ujistěte se, že specifikátor tt použijete pro jazyky, pro které je nezbytn�
         <target state="translated">Operátory</target>
         <note />
       </trans-unit>
-      <trans-unit id="Parameter_type_0_is_not_among_supported_types_1">
-        <source>Parameter type '{0}' is not among supported types: {1}</source>
-        <target state="new">Parameter type '{0}' is not among supported types: {1}</target>
-        <note />
-      </trans-unit>
       <trans-unit id="Please_resolve_errors_in_your_code_before_renaming_this_element">
         <source>Please resolve errors in your code before renaming this element.</source>
         <target state="translated">Před přejmenováním tohoto elementu prosím vyřešte chyby v kódu.</target>
@@ -1348,6 +1348,11 @@ Ujistěte se, že specifikátor tt použijete pro jazyky, pro které je nezbytn�
       <trans-unit id="Probable_JSON_string_detected">
         <source>Probable JSON string detected</source>
         <target state="translated">Zjistil se pravděpodobný řetězec JSON</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="Project_references_mutliple_assemblies_of_the_same_simple_name_0_1_Changing_a_reference_to_such_an_assembly_requires_restarting_the_application">
+        <source>Project references mutliple assemblies of the same simple name '{0}': {1}. Changing a reference to such an assembly requires restarting the application.</source>
+        <target state="new">Project references mutliple assemblies of the same simple name '{0}': {1}. Changing a reference to such an assembly requires restarting the application.</target>
         <note />
       </trans-unit>
       <trans-unit id="Properties_not_allowed_in_an_array">
@@ -1394,11 +1399,6 @@ Ujistěte se, že specifikátor tt použijete pro jazyky, pro které je nezbytn�
         <source>Quantifier and capture group numbers must be less than or equal to Int32.MaxValue</source>
         <target state="new">Quantifier and capture group numbers must be less than or equal to Int32.MaxValue</target>
         <note>This is an error message shown to the user when they write an invalid Regular Expression. Example: a{2147483648}</note>
-      </trans-unit>
-      <trans-unit id="Query">
-        <source>Query</source>
-        <target state="translated">Dotaz</target>
-        <note />
       </trans-unit>
       <trans-unit id="Reference_to_undefined_group_name_0">
         <source>Reference to undefined group name '{0}'</source>
@@ -2575,11 +2575,6 @@ Pozitivní kontrolní výrazy zpětného vyhledávání s nulovou délkou se obv
         <target state="translated">Změna názvu zachycené proměnné z {0} na {1} vyžaduje restartování aplikace.</target>
         <note />
       </trans-unit>
-      <trans-unit id="Renaming_anonymous_type_members_is_not_yet_supported">
-        <source>Renaming anonymous type members is not yet supported.</source>
-        <target state="translated">Přejmenování členů anonymního typu se zatím nepodporuje.</target>
-        <note />
-      </trans-unit>
       <trans-unit id="Replace_0_with_1">
         <source>Replace '{0}' with '{1}' </source>
         <target state="translated">Místo {0} použijte {1}</target>
@@ -2603,11 +2598,6 @@ Pozitivní kontrolní výrazy zpětného vyhledávání s nulovou délkou se obv
       <trans-unit id="Resolve_module_0_of_1">
         <source>Resolve module: '{0}' of '{1}'</source>
         <target state="translated">Přeložit modul: {0} z {1}</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="Return_type_0_is_not_among_supported_types_1">
-        <source>Return type '{0}' is not among supported types: {1}</source>
-        <target state="new">Return type '{0}' is not among supported types: {1}</target>
         <note />
       </trans-unit>
       <trans-unit id="RudeEdit">
@@ -2637,22 +2627,12 @@ Pozitivní kontrolní výrazy zpětného vyhledávání s nulovou délkou se obv
       </trans-unit>
       <trans-unit id="SemanticSearch">
         <source>Semantic Search</source>
-        <target state="translated">Sémantické vyhledávání</target>
+        <target state="new">Semantic Search</target>
         <note />
       </trans-unit>
       <trans-unit id="Semantic_search_only_supported_on_net_core">
         <source>Semantic search is only supported when code analysis runs in a separate process on the latest .NET (see Tools &gt; Options &gt; Text Editor &gt; C# &gt; Advanced).</source>
-        <target state="translated">Sémantické vyhledávání se podporuje jenom v případě, že se analýza kódu spouští v samostatném procesu na nejnovější verzi .NET (viz Nástroje &gt; Možnosti &gt; Textový editor &gt; C# &gt; Upřesnit).</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="Semantic_search_query_failed_to_compile">
-        <source>Semantic search query failed to compile</source>
-        <target state="translated">Nepovedlo se zkompilovat dotaz pro sémantické vyhledávání.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="Semantic_search_query_terminated_with_exception">
-        <source>Semantic search query terminated with exception</source>
-        <target state="translated">Dotaz pro sémantické vyhledávání byl ukončen s výjimkou.</target>
+        <target state="new">Semantic search is only supported when code analysis runs in a separate process on the latest .NET (see Tools &gt; Options &gt; Text Editor &gt; C# &gt; Advanced).</target>
         <note />
       </trans-unit>
       <trans-unit id="Silent">
@@ -2750,16 +2730,6 @@ Pozitivní kontrolní výrazy zpětného vyhledávání s nulovou délkou se obv
         <target state="needs-review-translation">Sestavení analyzátoru {0} odkazuje na verzi {1} kompilátoru, která je novější než aktuálně spuštěná verze {2}.</target>
         <note />
       </trans-unit>
-      <trans-unit id="The_query_does_not_specify_0_top_level_function">
-        <source>The query does not specify '{0}' top-level function</source>
-        <target state="new">The query does not specify '{0}' top-level function</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="The_query_specifies_multiple_top_level_functions_1">
-        <source>The query specifies multiple top-level functions '{1}'</source>
-        <target state="new">The query specifies multiple top-level functions '{1}'</target>
-        <note />
-      </trans-unit>
       <trans-unit id="The_selection_contains_a_local_function_call_without_its_declaration">
         <source>The selection contains a local function call without its declaration.</source>
         <target state="translated">Výběr obsahuje volání lokální funkce, aniž by byla deklarovaná.</target>
@@ -2800,11 +2770,6 @@ Pozitivní kontrolní výrazy zpětného vyhledávání s nulovou délkou se obv
         <target state="translated">Příliš mnoho znaků )</target>
         <note>This is an error message shown to the user when they write an invalid Regular Expression. Example: )</note>
       </trans-unit>
-      <trans-unit id="Top_level_function_0_must_have_a_single_parameter">
-        <source>Top-level function '{0}' must have a single parameter</source>
-        <target state="new">Top-level function '{0}' must have a single parameter</target>
-        <note />
-      </trans-unit>
       <trans-unit id="Trailing_comma_not_allowed">
         <source>Trailing comma not allowed</source>
         <target state="translated">Čárka na konci není povolená</target>
@@ -2828,11 +2793,6 @@ Pozitivní kontrolní výrazy zpětného vyhledávání s nulovou délkou se obv
       <trans-unit id="Unable_to_get_the_directory_name_for_0">
         <source>Unable to get the directory name for {0}.</source>
         <target state="new">Unable to get the directory name for {0}.</target>
-        <note />
-      </trans-unit>
-      <trans-unit id="Unable_to_load_type_0_1">
-        <source>Unable to load type '{0}': '{1}'</source>
-        <target state="translated">Nejde načíst typ {0}: {1}</target>
         <note />
       </trans-unit>
       <trans-unit id="Unknown_property">
@@ -3260,6 +3220,11 @@ Pozitivní kontrolní výrazy zpětného vyhledávání s nulovou délkou se obv
         <target state="translated">{0} tady není null.</target>
         <note />
       </trans-unit>
+      <trans-unit id="_0_is_not_nullable_aware">
+        <source>'{0}' is not nullable aware.</source>
+        <target state="new">'{0}' is not nullable aware.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="_0_items_in_cache">
         <source>'{0}' items in cache</source>
         <target state="translated">Počet položek v mezipaměti: {0}</target>
@@ -3623,6 +3588,11 @@ Pokud se specifikátor formátu d použije bez dalších specifikátorů vlastn�
         <target state="translated">Specifikátor vlastního formátu dddd (a libovolný počet dalších specifikátorů d) reprezentuje celý název dne v týdnu. Lokalizovaný název dne v týdnu se načítá z vlastnosti DateTimeFormatInfo.DayNames aktuální nebo zadané jazykové verze.</target>
         <note />
       </trans-unit>
+      <trans-unit id="default">
+        <source>default&gt;</source>
+        <target state="new">default&gt;</target>
+        <note />
+      </trans-unit>
       <trans-unit id="discard">
         <source>discard</source>
         <target state="translated">proměnná typu discard</target>
@@ -3637,6 +3607,11 @@ Pokud se specifikátor formátu d použije bez dalších specifikátorů vlastn�
         <source>embedded</source>
         <target state="translated">zapuštěná</target>
         <note>Embedded is a technical term for "Embedded source", where souce files are embedded into the PDB</note>
+      </trans-unit>
+      <trans-unit id="extension_block">
+        <source>extension block</source>
+        <target state="new">extension block</target>
+        <note />
       </trans-unit>
       <trans-unit id="external">
         <source>external</source>
@@ -4170,8 +4145,8 @@ Chcete pokračovat?</target>
       </trans-unit>
       <trans-unit id="Change_signature">
         <source>Change signature...</source>
-        <target state="translated">Změnit signaturu...</target>
-        <note />
+        <target state="needs-review-translation">Změnit signaturu...</target>
+        <note>Here 'signature' refers to a programming signature (e.g., a method signature), not a legal signature</note>
       </trans-unit>
       <trans-unit id="Generate_new_type">
         <source>Generate new type...</source>

@@ -46,18 +46,7 @@ internal static class GoToDefinitionFeatureHelpers
         var definition = await SymbolFinder.FindSourceDefinitionAsync(symbol, solution, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
-        symbol = definition ?? symbol;
-
-        // If symbol has a partial implementation part, prefer to go to it, since that is where the body is.
-        symbol = symbol switch
-        {
-            IMethodSymbol method => method.PartialImplementationPart,
-            IPropertySymbol property => property.PartialImplementationPart,
-            IEventSymbol ev => ev.PartialImplementationPart,
-            _ => symbol,
-        } ?? symbol;
-
-        return symbol;
+        return definition ?? symbol;
     }
 
     public static async Task<ImmutableArray<DefinitionItem>> GetDefinitionsAsync(
@@ -91,7 +80,8 @@ internal static class GoToDefinitionFeatureHelpers
         // So, if we only have a single location to go to, this does no unnecessary work.  And,
         // if we do have multiple locations to show, it will just be done in the BG, unblocking
         // this command thread so it can return the user faster.
-        var definitionItem = symbol.ToNonClassifiedDefinitionItem(solution, includeHiddenLocations: true);
+        var definitionItem = await symbol.ToNonClassifiedDefinitionItemAsync(
+            solution, includeHiddenLocations: true, cancellationToken).ConfigureAwait(false);
 
         if (thirdPartyNavigationAllowed)
         {

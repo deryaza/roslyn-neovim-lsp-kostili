@@ -9,7 +9,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.AddImportOnPaste;
 using Microsoft.CodeAnalysis.Classification;
 using Microsoft.CodeAnalysis.CodeStyle;
-using Microsoft.CodeAnalysis.ColorSchemes;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.DocumentationComments;
@@ -21,7 +20,6 @@ using Microsoft.CodeAnalysis.Editor.Implementation.RenameTracking;
 using Microsoft.CodeAnalysis.Editor.Implementation.SplitComment;
 using Microsoft.CodeAnalysis.Editor.InlineDiagnostics;
 using Microsoft.CodeAnalysis.Editor.InlineHints;
-using Microsoft.CodeAnalysis.Editor.InlineRename;
 using Microsoft.CodeAnalysis.Editor.Shared.Options;
 using Microsoft.CodeAnalysis.Features.EmbeddedLanguages.Json.LanguageServices;
 using Microsoft.CodeAnalysis.Features.EmbeddedLanguages.RegularExpressions.LanguageServices;
@@ -29,20 +27,17 @@ using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.ImplementType;
 using Microsoft.CodeAnalysis.InheritanceMargin;
 using Microsoft.CodeAnalysis.InlineHints;
-using Microsoft.CodeAnalysis.InlineRename;
 using Microsoft.CodeAnalysis.KeywordHighlighting;
 using Microsoft.CodeAnalysis.LineSeparators;
 using Microsoft.CodeAnalysis.MetadataAsSource;
 using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.ReferenceHighlighting;
-using Microsoft.CodeAnalysis.Remote;
 using Microsoft.CodeAnalysis.SolutionCrawler;
 using Microsoft.CodeAnalysis.StackTraceExplorer;
 using Microsoft.CodeAnalysis.StringCopyPaste;
 using Microsoft.CodeAnalysis.Structure;
 using Microsoft.CodeAnalysis.SymbolSearch;
 using Microsoft.CodeAnalysis.ValidateFormatString;
-using Microsoft.VisualStudio.LanguageServices.DocumentOutline;
 using Microsoft.VisualStudio.LanguageServices.Implementation.Options;
 
 namespace Microsoft.VisualStudio.LanguageServices.CSharp.Options;
@@ -109,6 +104,8 @@ internal sealed partial class AdvancedOptionPageControl : AbstractOptionPageCont
 
         // Comments
         BindToOption(GenerateXmlDocCommentsForTripleSlash, DocumentationCommentOptionsStorage.AutoXmlDocCommentGeneration, LanguageNames.CSharp);
+        BindToOption(GenerateXmlDocCommentsOnSingleLine, DocumentationCommentOptionsStorage.GenerateSummaryTagOnSingleLine, LanguageNames.CSharp);
+        BindToOption(GenerateOnlySummaryTag, DocumentationCommentOptionsStorage.GenerateOnlySummaryTag, LanguageNames.CSharp);
         BindToOption(InsertSlashSlashAtTheStartOfNewLinesWhenWritingSingleLineComments, SplitCommentOptionsStorage.Enabled, LanguageNames.CSharp);
         BindToOption(InsertAsteriskAtTheStartOfNewLinesWhenWritingBlockComments, BlockCommentEditingOptionsStorage.AutoInsertBlockCommentStartString, LanguageNames.CSharp);
 
@@ -131,9 +128,6 @@ internal sealed partial class AdvancedOptionPageControl : AbstractOptionPageCont
         BindToOption(Colorize_JSON_strings, ClassificationOptionsStorage.ColorizeJsonPatterns, LanguageNames.CSharp);
         BindToOption(Report_invalid_JSON_strings, JsonDetectionOptionsStorage.ReportInvalidJsonPatterns, LanguageNames.CSharp);
         BindToOption(Highlight_related_JSON_components_under_cursor, HighlightingOptionsStorage.HighlightRelatedJsonComponentsUnderCursor, LanguageNames.CSharp);
-
-        // Classifications
-        BindToOption(Editor_color_scheme, ColorSchemeOptionsStorage.ColorScheme);
 
         // Implement Interface or Abstract Class
         BindToOption(with_other_members_of_the_same_kind, ImplementTypeOptionsStorage.InsertionBehavior, ImplementTypeInsertionBehavior.WithOtherMembersOfTheSameKind, LanguageNames.CSharp);

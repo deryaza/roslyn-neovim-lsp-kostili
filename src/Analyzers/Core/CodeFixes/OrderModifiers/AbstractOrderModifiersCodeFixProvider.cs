@@ -6,8 +6,8 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.CodeStyle;
 using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.CodeStyle;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.LanguageService;
@@ -16,18 +16,12 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.OrderModifiers;
 
-internal abstract class AbstractOrderModifiersCodeFixProvider : SyntaxEditorBasedCodeFixProvider
+internal abstract class AbstractOrderModifiersCodeFixProvider(
+    ISyntaxFacts syntaxFacts,
+    AbstractOrderModifiersHelpers helpers) : SyntaxEditorBasedCodeFixProvider
 {
-    private readonly ISyntaxFacts _syntaxFacts;
-    private readonly AbstractOrderModifiersHelpers _helpers;
-
-    protected AbstractOrderModifiersCodeFixProvider(
-        ISyntaxFacts syntaxFacts,
-        AbstractOrderModifiersHelpers helpers)
-    {
-        _syntaxFacts = syntaxFacts;
-        _helpers = helpers;
-    }
+    private readonly ISyntaxFacts _syntaxFacts = syntaxFacts;
+    private readonly AbstractOrderModifiersHelpers _helpers = helpers;
 
     protected abstract ImmutableArray<string> FixableCompilerErrorIds { get; }
     protected abstract CodeStyleOption2<string> GetCodeStyleOption(AnalyzerOptionsProvider options);

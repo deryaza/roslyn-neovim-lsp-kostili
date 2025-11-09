@@ -9,6 +9,7 @@ using System.Text.Json.Serialization;
 using Roslyn.Text.Adornments;
 
 namespace Roslyn.LanguageServer.Protocol;
+
 internal sealed class ClassifiedTextElementConverter : JsonConverter<ClassifiedTextElement>
 {
     public static readonly ClassifiedTextElementConverter Instance = new();
@@ -36,7 +37,7 @@ internal sealed class ClassifiedTextElementConverter : JsonConverter<ClassifiedT
                             if (reader.TokenType == JsonTokenType.EndArray)
                                 break;
 
-                            objects.Add(ClassifiedTextRunConverter.Instance.Read(ref reader, typeof(ClassifiedTextRun), options)!);
+                            objects.Add(ClassifiedTextRunConverter.Instance.Read(ref reader, typeof(ClassifiedTextRun), options));
                         }
 
                         break;

@@ -33,9 +33,6 @@ public sealed class DidChangeConfigurationNotificationHandlerTest : AbstractLang
     [Theory, CombinatorialData]
     public async Task VerifyNoRequestToClientWithoutCapability(bool mutatingLspWorkspace)
     {
-        var markup = @"
-public class B { }";
-
         var clientCapabilities = new ClientCapabilities()
         {
             Workspace = new WorkspaceClientCapabilities()
@@ -55,15 +52,18 @@ public class B { }";
         };
 
         await CreateTestLspServerAsync(
-            markup, mutatingLspWorkspace, initializationOptions);
+            """
+            public class B { }
+            """, mutatingLspWorkspace, initializationOptions);
         Assert.False(clientCallbackTarget.ReceivedWorkspaceConfigurationRequest);
     }
 
     [Theory, CombinatorialData]
     public async Task VerifyWorkflow(bool mutatingLspWorkspace)
     {
-        var markup = @"
-public class A { }";
+        var markup = """
+            public class A { }
+            """;
 
         var clientCapabilities = new ClientCapabilities()
         {
@@ -210,7 +210,7 @@ public class A { }";
         {
             ReceivedWorkspaceConfigurationRequest = true;
             var expectConfigurationItemsNumber = DidChangeConfigurationNotificationHandler.SupportedOptions.Sum(option => option is IPerLanguageValuedOption ? 2 : 1);
-            Assert.Equal(expectConfigurationItemsNumber, configurationParams!.Items.Length);
+            Assert.Equal(expectConfigurationItemsNumber, configurationParams.Items.Length);
             Assert.Equal(expectConfigurationItemsNumber, MockClientSideValues.Count);
 
             foreach (var item in configurationParams.Items)
@@ -337,7 +337,7 @@ public class A { }";
         {
             Assert.NotNull(section);
             var regex = new Regex(s_clientSideSectionPattern);
-            var match = regex.Match(section!);
+            var match = regex.Match(section);
             Assert.True(match.Success);
         }
     }

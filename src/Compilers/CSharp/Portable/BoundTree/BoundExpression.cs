@@ -403,9 +403,10 @@ namespace Microsoft.CodeAnalysis.CSharp
     {
         public override ConstantValue? ConstantValueOpt => Data?.ConstantValue;
 
-        public override Symbol? ExpressionSymbol => this.Method;
+        public override Symbol? ExpressionSymbol => this.BinaryOperatorMethod;
 
-        internal MethodSymbol? Method => Data?.Method;
+        public MethodSymbol? BinaryOperatorMethod => OperatorKind.IsDynamic() ? null : Data?.Method;
+        public MethodSymbol? LeftTruthOperatorMethod => OperatorKind.IsDynamic() && OperatorKind.IsLogical() ? Data?.Method : null;
 
         internal TypeSymbol? ConstrainedToType => Data?.ConstrainedToType;
 
@@ -418,6 +419,13 @@ namespace Microsoft.CodeAnalysis.CSharp
 
     internal partial class BoundUserDefinedConditionalLogicalOperator
     {
+        private partial void Validate()
+        {
+            Debug.Assert(LogicalOperator.ParameterCount == 2);
+            Debug.Assert(TrueOperator.ParameterCount == 1);
+            Debug.Assert(FalseOperator.ParameterCount == 1);
+        }
+
         public override Symbol ExpressionSymbol
         {
             get { return this.LogicalOperator; }

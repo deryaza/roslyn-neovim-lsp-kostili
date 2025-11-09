@@ -7,7 +7,6 @@ using System.ComponentModel.Composition;
 using Microsoft.CodeAnalysis.Editor;
 using Microsoft.CodeAnalysis.Editor.Commanding.Commands;
 using Microsoft.CodeAnalysis.GoOrFind;
-using Microsoft.CodeAnalysis.GoToDefinition;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.VisualStudio.Commanding;
 using Microsoft.VisualStudio.Utilities;
@@ -17,6 +16,7 @@ namespace Microsoft.CodeAnalysis.GoToImplementation;
 [Export(typeof(ICommandHandler))]
 [ContentType(ContentTypeNames.RoslynContentType)]
 [Name(PredefinedCommandHandlerNames.GoToImplementation)]
+[Order(Before = PredefinedCommandHandlerNames.LspGoToImplementation)]
 [method: ImportingConstructor]
 [method: Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
 internal sealed class GoToImplementationCommandHandler(GoToImplementationNavigationService navigationService)

@@ -22,6 +22,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.PooledObjects;
@@ -402,55 +403,6 @@ namespace Microsoft.CodeAnalysis.CSharp
             return pendingReturns;
         }
 
-        protected override ImmutableArray<PendingBranch> RemoveReturns()
-        {
-            var result = base.RemoveReturns();
-
-            if (CurrentSymbol is MethodSymbol currentMethod && currentMethod.IsAsync && !currentMethod.IsImplicitlyDeclared)
-            {
-                var foundAwait = result.Any(static pending => HasAwait(pending));
-                if (!foundAwait)
-                {
-                    // If we're on a LambdaSymbol, then use its 'DiagnosticLocation'.  That will be
-                    // much better than using its 'Location' (which is the entire span of the lambda).
-                    var diagnosticLocation = CurrentSymbol is LambdaSymbol lambda
-                        ? lambda.DiagnosticLocation
-                        : CurrentSymbol.GetFirstLocationOrNone();
-
-                    Diagnostics.Add(ErrorCode.WRN_AsyncLacksAwaits, diagnosticLocation);
-                }
-            }
-
-            return result;
-        }
-
-        private static bool HasAwait(PendingBranch pending)
-        {
-            var pendingBranch = pending.Branch;
-            if (pendingBranch is null)
-            {
-                return false;
-            }
-
-            BoundKind kind = pendingBranch.Kind;
-            switch (kind)
-            {
-                case BoundKind.AwaitExpression:
-                    return true;
-                case BoundKind.UsingStatement:
-                    var usingStatement = (BoundUsingStatement)pendingBranch;
-                    return usingStatement.AwaitOpt != null;
-                case BoundKind.ForEachStatement:
-                    var foreachStatement = (BoundForEachStatement)pendingBranch;
-                    return foreachStatement.AwaitOpt != null;
-                case BoundKind.UsingLocalDeclarations:
-                    var localDeclaration = (BoundUsingLocalDeclarations)pendingBranch;
-                    return localDeclaration.AwaitOpt != null;
-                default:
-                    return false;
-            }
-        }
-
         // For purpose of definite assignment analysis, awaits create pending branches, so async usings and foreachs do too
         public sealed override bool AwaitUsingAndForeachAddsPendingBranch => true;
 
@@ -593,7 +545,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             compatDiagnostics.Free();
             foreach (var diagnostic in strictDiagnostics.AsEnumerable())
             {
-                // If it is a warning (e.g. WRN_AsyncLacksAwaits), or an error that would be reported by the compatible analysis, just report it.
+                // If it is a warning, or an error that would be reported by the compatible analysis, just report it.
                 if (diagnostic.Severity != DiagnosticSeverity.Error || compatDiagnosticSet.Contains(diagnostic))
                 {
                     diagnostics.Add(diagnostic);
@@ -2304,14 +2256,6 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private void DeclareVariables(OneOrMany<LocalSymbol> locals)
-        {
-            foreach (var symbol in locals)
-            {
-                DeclareVariable(symbol);
-            }
-        }
-
         private void DeclareVariable(LocalSymbol symbol)
         {
             var initiallyAssigned =
@@ -2363,11 +2307,11 @@ namespace Microsoft.CodeAnalysis.CSharp
         public override BoundNode VisitLocal(BoundLocal node)
         {
             LocalSymbol localSymbol = node.LocalSymbol;
-            if ((localSymbol as SourceLocalSymbol)?.IsVar == true && localSymbol.ForbiddenZone?.Contains(node.Syntax) == true)
+            if (node.Type == (object)this.compilation.ImplicitlyTypedVariableUsedInForbiddenZoneType)
             {
                 // Since we've already reported a use of the variable where not permitted, we
                 // suppress the diagnostic that the variable may not be assigned where used.
-                int slot = GetOrCreateSlot(node.LocalSymbol);
+                int slot = GetOrCreateSlot(localSymbol);
                 if (slot > 0)
                 {
                     _alreadyReported[slot] = true;
@@ -2641,6 +2585,8 @@ namespace Microsoft.CodeAnalysis.CSharp
 #nullable enable
         private void MarkFieldsUsed(TypeSymbol type)
         {
+            type = type.OriginalDefinition;
+
             switch (type.TypeKind)
             {
                 case TypeKind.Array:
@@ -2686,7 +2632,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return null;
         }
 
-        protected override void VisitCatchBlock(BoundCatchBlock catchBlock, ref LocalState finallyState)
+        public override BoundNode VisitCatchBlock(BoundCatchBlock catchBlock)
         {
             DeclareVariables(catchBlock.Locals);
 
@@ -2696,12 +2642,14 @@ namespace Microsoft.CodeAnalysis.CSharp
                 Assign(exceptionSource, value: null, read: false);
             }
 
-            base.VisitCatchBlock(catchBlock, ref finallyState);
+            base.VisitCatchBlock(catchBlock);
 
             foreach (var local in catchBlock.Locals)
             {
                 ReportIfUnused(local, assigned: local.DeclarationKind != LocalDeclarationKind.CatchVariable);
             }
+
+            return null;
         }
 
         public override BoundNode VisitFieldAccess(BoundFieldAccess node)

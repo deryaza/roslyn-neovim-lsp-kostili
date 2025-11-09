@@ -432,7 +432,7 @@ internal abstract partial class AbstractInheritanceMarginService
             topLevelDisplayText: null,
             FindUsagesHelpers.GetDisplayParts(interfaceSymbol),
             interfaceSymbol.GetGlyph(),
-            nonNullBaseSymbolItems.Concat(nonNullDerivedTypeItems));
+            [.. nonNullBaseSymbolItems, .. nonNullDerivedTypeItems]);
     }
 
     private static async ValueTask<InheritanceMarginItem?> CreateInheritanceMemberItemForInterfaceMemberAsync(
@@ -499,7 +499,7 @@ internal abstract partial class AbstractInheritanceMarginService
             topLevelDisplayText: null,
             FindUsagesHelpers.GetDisplayParts(memberSymbol),
             memberSymbol.GetGlyph(),
-            nonNullBaseSymbolItems.Concat(nonNullDerivedTypeItems));
+            [.. nonNullBaseSymbolItems, .. nonNullDerivedTypeItems]);
     }
 
     private static async ValueTask<InheritanceMarginItem?> CreateInheritanceMemberItemForClassOrStructMemberAsync(
@@ -550,7 +550,7 @@ internal abstract partial class AbstractInheritanceMarginService
             topLevelDisplayText: null,
             FindUsagesHelpers.GetDisplayParts(memberSymbol),
             memberSymbol.GetGlyph(),
-            nonNullImplementedMemberItems.Concat(nonNullOverriddenMemberItems, nonNullOverridingMemberItems));
+            [.. nonNullImplementedMemberItems, .. nonNullOverriddenMemberItems, .. nonNullOverridingMemberItems]);
     }
 
     private static async ValueTask<InheritanceTargetItem?> CreateInheritanceItemAsync(
@@ -563,7 +563,7 @@ internal abstract partial class AbstractInheritanceMarginService
         targetSymbol = symbolInSource ?? targetSymbol;
 
         // Right now the targets are not shown in a classified way.
-        var definition = ToSlimDefinitionItem(targetSymbol, solution);
+        var definition = await ToSlimDefinitionItemAsync(solution, targetSymbol, cancellationToken).ConfigureAwait(false);
         if (definition == null)
             return null;
 
@@ -692,7 +692,7 @@ internal abstract partial class AbstractInheritanceMarginService
                 solution,
                 transitive: true,
                 cancellationToken: cancellationToken).ConfigureAwait(false);
-            return allDerivedInterfaces.Concat(allImplementations);
+            return [.. allDerivedInterfaces, .. allImplementations];
         }
         else
         {
@@ -711,15 +711,17 @@ internal abstract partial class AbstractInheritanceMarginService
     /// Otherwise, create the full non-classified DefinitionItem. Because in such case we want to display all the locations to the user
     /// by reusing the FAR window.
     /// </summary>
-    private static DefinitionItem? ToSlimDefinitionItem(ISymbol symbol, Solution solution)
+    private static async Task<DefinitionItem?> ToSlimDefinitionItemAsync(
+        Solution solution, ISymbol symbol, CancellationToken cancellation)
     {
         var locations = symbol.Locations;
         if (locations.Length > 1)
         {
-            return symbol.ToNonClassifiedDefinitionItem(
+            return await symbol.ToNonClassifiedDefinitionItemAsync(
                 solution,
                 FindReferencesSearchOptions.Default with { UnidirectionalHierarchyCascade = true },
-                includeHiddenLocations: false);
+                includeHiddenLocations: false,
+                cancellation).ConfigureAwait(false);
         }
 
         if (locations is [var location])

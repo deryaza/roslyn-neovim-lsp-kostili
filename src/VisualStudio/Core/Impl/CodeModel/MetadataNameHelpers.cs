@@ -5,7 +5,6 @@
 #nullable disable
 
 using System;
-using System.Collections.Generic;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.PooledObjects;
@@ -26,7 +25,7 @@ internal static class MetadataNameHelpers
             var typeArguments = namedTypeSymbol.TypeArguments;
 
             builder.Append('`');
-            builder.Append(typeArguments.Length);
+            builder.Append(typeArguments.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
             // Append generic arguments
             builder.Append('[');

@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Test.Utilities;
+using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Editing;
@@ -33,16 +34,17 @@ public sealed class SyntaxEditorTests
     }
 
     private SyntaxEditor GetEditor(SyntaxNode root)
-        => new SyntaxEditor(root, EmptyWorkspace.Services.SolutionServices);
+        => new(root, EmptyWorkspace.Services.SolutionServices);
 
     [Fact]
     public void TestReplaceNode()
     {
-        var code = @"
-public class C
-{
-    public int X;
-}";
+        var code = """
+            public class C
+            {
+                public int X;
+            }
+            """;
 
         var cu = SyntaxFactory.ParseCompilationUnit(code);
         var cls = cu.Members[0];
@@ -54,21 +56,23 @@ public class C
 
         VerifySyntax<CompilationUnitSyntax>(
             newRoot,
-            @"
-public class C
-{
-    public string Y;
-}");
+            """
+            public class C
+            {
+                public string Y;
+            }
+            """);
     }
 
     [Fact]
     public void TestRemoveNode()
     {
-        var code = @"
-public class C
-{
-    public int X;
-}";
+        var code = """
+            public class C
+            {
+                public int X;
+            }
+            """;
 
         var cu = SyntaxFactory.ParseCompilationUnit(code);
         var cls = cu.Members[0];
@@ -80,20 +84,22 @@ public class C
 
         VerifySyntax<CompilationUnitSyntax>(
             newRoot,
-            @"
-public class C
-{
-}");
+            """
+            public class C
+            {
+            }
+            """);
     }
 
     [Fact]
     public void TestInsertAfter()
     {
-        var code = @"
-public class C
-{
-    public int X;
-}";
+        var code = """
+            public class C
+            {
+                public int X;
+            }
+            """;
 
         var cu = SyntaxFactory.ParseCompilationUnit(code);
         var cls = cu.Members[0];
@@ -105,22 +111,24 @@ public class C
 
         VerifySyntax<CompilationUnitSyntax>(
             newRoot,
-            @"
-public class C
-{
-    public int X;
-    public string Y;
-}");
+            """
+            public class C
+            {
+                public int X;
+                public string Y;
+            }
+            """);
     }
 
     [Fact]
     public void TestInsertBefore()
     {
-        var code = @"
-public class C
-{
-    public int X;
-}";
+        var code = """
+            public class C
+            {
+                public int X;
+            }
+            """;
 
         var cu = SyntaxFactory.ParseCompilationUnit(code);
         var cls = cu.Members[0];
@@ -132,22 +140,24 @@ public class C
 
         VerifySyntax<CompilationUnitSyntax>(
             newRoot,
-            @"
-public class C
-{
-    public string Y;
-    public int X;
-}");
+            """
+            public class C
+            {
+                public string Y;
+                public int X;
+            }
+            """);
     }
 
     [Fact]
     public void TestTrackNode()
     {
-        var code = @"
-public class C
-{
-    public int X;
-}";
+        var code = """
+            public class C
+            {
+                public int X;
+            }
+            """;
 
         var cu = SyntaxFactory.ParseCompilationUnit(code);
         var cls = cu.Members[0];
@@ -164,11 +174,12 @@ public class C
     [Fact]
     public void TestMultipleEdits()
     {
-        var code = @"
-public class C
-{
-    public int X;
-}";
+        var code = """
+            public class C
+            {
+                public int X;
+            }
+            """;
 
         var cu = SyntaxFactory.ParseCompilationUnit(code);
         var cls = cu.Members[0];
@@ -182,12 +193,13 @@ public class C
 
         VerifySyntax<CompilationUnitSyntax>(
             newRoot,
-            @"
-public class C
-{
-    public object Z;
-    public string Y;
-}");
+            """
+            public class C
+            {
+                public object Z;
+                public string Y;
+            }
+            """);
     }
 
     [Fact]
@@ -204,18 +216,6 @@ public class C
     }
 }
 """;
-        var fixedCode = """
-using System;
-using System.CodeAnalysis;
-
-public class C
-{
-    Type Main([Example(Sample.Attribute)] Type t)
-    {
-    }
-}
-""";
-
         var cu = SyntaxFactory.ParseCompilationUnit(code);
         var cls = cu.Members[0];
 
@@ -231,7 +231,17 @@ public class C
         var newRoot = editor.GetChangedRoot();
 
         VerifySyntax<CompilationUnitSyntax>(
-            newRoot, fixedCode);
+            newRoot, """
+using System;
+using System.CodeAnalysis;
+
+public class C
+{
+    Type Main([Example(Sample.Attribute)] Type t)
+    {
+    }
+}
+""");
     }
 
     [Fact]
@@ -248,18 +258,6 @@ public class C
     }
 }
 """;
-        var fixedCode = """
-using System;
-using System.CodeAnalysis;
-
-public class C
-{
-    Type Main<[Example(Sample.Attribute)] T>()
-    {
-    }
-}
-""";
-
         var cu = SyntaxFactory.ParseCompilationUnit(code);
         var cls = cu.Members[0];
 
@@ -275,7 +273,17 @@ public class C
         var newRoot = editor.GetChangedRoot();
 
         VerifySyntax<CompilationUnitSyntax>(
-            newRoot, fixedCode);
+            newRoot, """
+using System;
+using System.CodeAnalysis;
+
+public class C
+{
+    Type Main<[Example(Sample.Attribute)] T>()
+    {
+    }
+}
+""");
     }
 
     [Fact]
@@ -292,19 +300,6 @@ public class C
     }
 }
 """;
-        var fixedCode = """
-using System;
-using System.CodeAnalysis;
-
-public class C
-{
-    [return: Example(Sample.Attribute)]
-    Type Main(Type t)
-    {
-    }
-}
-""";
-
         var cu = SyntaxFactory.ParseCompilationUnit(code);
         var cls = cu.Members[0];
 
@@ -318,6 +313,53 @@ public class C
         var newRoot = editor.GetChangedRoot();
 
         VerifySyntax<CompilationUnitSyntax>(
-            newRoot, fixedCode);
+            newRoot, """
+using System;
+using System.CodeAnalysis;
+
+public class C
+{
+    [return: Example(Sample.Attribute)]
+    Type Main(Type t)
+    {
+    }
+}
+""");
+    }
+
+    [Fact, WorkItem("https://github.com/dotnet/roslyn/issues/78860")]
+    public void TestInsertDelegateIntoInterface()
+    {
+        var code = """
+            public interface ITest
+            {
+                void Method();
+            }
+            """;
+
+        var cu = SyntaxFactory.ParseCompilationUnit(code);
+        var interfaceDecl = (InterfaceDeclarationSyntax)cu.Members[0];
+
+        var editor = GetEditor(cu);
+
+        // Create a delegate declaration
+        var delegateDecl = SyntaxFactory.DelegateDeclaration(
+            SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)),
+            SyntaxFactory.Identifier("MyDelegate"))
+            .WithParameterList(SyntaxFactory.ParameterList());
+
+        editor.InsertMembers(interfaceDecl, 0, new[] { delegateDecl });
+        var newRoot = editor.GetChangedRoot();
+
+        VerifySyntax<CompilationUnitSyntax>(
+            newRoot,
+            """
+            public interface ITest
+            {
+                delegate void MyDelegate();
+
+                void Method();
+            }
+            """);
     }
 }

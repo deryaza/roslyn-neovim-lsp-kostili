@@ -10,11 +10,11 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.CodeGen;
+using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.CSharp.CodeGen;
 using Microsoft.CodeAnalysis.CSharp.Emit;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.PooledObjects;
-using Microsoft.CodeAnalysis.Shared.Collections;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
@@ -221,7 +221,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         public BoundThisReference This()
         {
-            Debug.Assert(CurrentFunction is { IsStatic: false });
+            Debug.Assert(CurrentFunction is { IsStatic: false, ThisParameter: { } });
             return new BoundThisReference(Syntax, CurrentFunction.ThisParameter.Type) { WasCompilerGenerated = true };
         }
 
@@ -522,7 +522,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     (epilogue != null) ? Concat(innerInstrumentation.Epilogue, epilogue) : innerInstrumentation.Epilogue)
                 : new BoundBlockInstrumentation(
                     Syntax,
-                    OneOrMany.OneOrNone(local),
+                    (local != null) ? [local] : [],
                     prologue,
                     epilogue);
         }
@@ -550,7 +550,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 statements.Add(statement);
             }
 
-            return Block(instrumentation.Locals.ToImmutable(), statements.ToImmutableAndClear());
+            return Block(instrumentation.Locals, statements.ToImmutableAndClear());
         }
 
         public BoundReturnStatement Return(BoundExpression? expression = null)
@@ -576,7 +576,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
             }
 
-            return new BoundReturnStatement(Syntax, CurrentFunction.RefKind, expression, @checked: false) { WasCompilerGenerated = true };
+            return new BoundReturnStatement(Syntax, CurrentFunction.RefKind != RefKind.None ? RefKind.Ref : RefKind.None, expression, @checked: false) { WasCompilerGenerated = true };
         }
 
         public void CloseMethod(BoundStatement body)
@@ -1201,7 +1201,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         public BoundStatement BaseInitialization()
         {
             // TODO: add diagnostics for when things fall apart
-            Debug.Assert(CurrentFunction is { });
+            Debug.Assert(CurrentFunction is { ThisParameter: { } });
             NamedTypeSymbol baseType = CurrentFunction.ThisParameter.Type.BaseTypeNoUseSiteDiagnostics;
             var ctor = baseType.InstanceConstructors.Single(c => c.ParameterCount == 0);
             return new BoundExpressionStatement(Syntax, Call(Base(baseType), ctor)) { WasCompilerGenerated = true };

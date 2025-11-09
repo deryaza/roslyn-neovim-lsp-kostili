@@ -6,6 +6,7 @@
 
 using System.Collections.Immutable;
 using System.Diagnostics;
+using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Roslyn.Utilities;
 
@@ -125,6 +126,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 return _lazyReturnType;
             }
         }
+
+        public override ImmutableArray<CustomModifier> RefCustomModifiers => [];
 
         private static DeclarationModifiers MakeModifiers(NamedTypeSymbol containingType, SyntaxTokenList modifiers, Location location, BindingDiagnosticBag diagnostics, out bool modifierErrors)
         {

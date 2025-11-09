@@ -168,7 +168,7 @@ public sealed partial class AsyncLazyTests
                     c.ThrowIfCancellationRequested();
                 }
             },
-            synchronousComputeFunction: synchronousComputation!,
+            synchronousComputeFunction: synchronousComputation,
             arg: computeFunctionRunning);
 
         var cancellationTokenSource = new CancellationTokenSource();
@@ -183,7 +183,7 @@ public sealed partial class AsyncLazyTests
         try
         {
             doGetValue(lazy, cancellationTokenSource.Token);
-            AssertEx.Fail(nameof(AsyncLazy<object>.GetValue) + " did not throw an exception.");
+            AssertEx.Fail(nameof(AsyncLazy<>.GetValue) + " did not throw an exception.");
         }
         catch (OperationCanceledException oce)
         {
@@ -211,7 +211,7 @@ public sealed partial class AsyncLazyTests
         try
         {
             task.Wait();
-            AssertEx.Fail(nameof(AsyncLazy<object>.GetValueAsync) + " did not throw an exception.");
+            AssertEx.Fail(nameof(AsyncLazy<>.GetValueAsync) + " did not throw an exception.");
         }
         catch (AggregateException ex)
         {
@@ -242,7 +242,7 @@ public sealed partial class AsyncLazyTests
 
         var lazy = AsyncLazy.Create(
             static (synchronousComputation, c) => Task.FromResult(synchronousComputation(c)),
-            includeSynchronousComputation ? static (synchronousComputation, c) => synchronousComputation(c) : null!,
+            includeSynchronousComputation ? static (synchronousComputation, c) => synchronousComputation(c) : null,
             arg: synchronousComputation);
 
         var thrownException = Assert.Throws<OperationCanceledException>(() =>
