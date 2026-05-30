@@ -10,6 +10,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.FindUsages;
+using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.QuickInfo.Presentation;
 using Microsoft.CodeAnalysis.Shared.Collections;
 using Microsoft.CodeAnalysis.Shared.Extensions;
@@ -64,6 +65,11 @@ internal static partial class Extensions
         return documentUri.ParsedUri;
     }
 
+    public static string GetDocumentFilePathFromUri(this DocumentUri uri)
+    {
+        return uri.ParsedUri?.IsFile == true ? uri.ParsedUri.LocalPath : uri.UriString;
+    }
+
     /// <summary>
     /// Get all regular and additional <see cref="TextDocument"/>s for the given <paramref name="documentUri"/>.
     /// This will not return source generated documents.
@@ -72,11 +78,18 @@ internal static partial class Extensions
     {
         var documentIds = GetDocumentIds(solution, documentUri);
 
-        var documents = documentIds
-            .Select(solution.GetTextDocument)
-            .WhereNotNull()
-            .ToImmutableArray();
-        return documents;
+        if (documentIds.IsEmpty)
+            return [];
+
+        using var _ = ArrayBuilder<TextDocument>.GetInstance(out var documentsBuilder);
+
+        foreach (var documentId in documentIds)
+        {
+            if (solution.GetTextDocument(documentId) is { } document)
+                documentsBuilder.Add(document);
+        }
+
+        return documentsBuilder.ToImmutableAndClear();
     }
 
     public static ImmutableArray<DocumentId> GetDocumentIds(this Solution solution, DocumentUri documentUri)
@@ -90,7 +103,7 @@ internal static partial class Extensions
 
         // If this is not our special scheme for generated documents, then we can just look for documents with that file path.
         if (documentUri.ParsedUri.Scheme != SourceGeneratedDocumentUri.Scheme)
-            return solution.GetDocumentIdsWithFilePath(ProtocolConversions.GetDocumentFilePathFromUri(documentUri.ParsedUri));
+            return solution.GetDocumentIdsWithFilePath(documentUri.GetDocumentFilePathFromUri());
 
         // We can get a null documentId if we were unable to find the project associated with the
         // generated document - this can happen if say a project is unloaded.  There may be LSP requests
@@ -466,6 +479,8 @@ internal static partial class Extensions
             Glyph.TargetTypeMatch => (KnownImageIds.ImageCatalogGuid, KnownImageIds.MatchType),
 
             Glyph.TypeParameter => (KnownImageIds.ImageCatalogGuid, KnownImageIds.Type),
+
+            Glyph.Copilot => (KnownImageIds.ImageCatalogGuid, KnownImageIds.SparkleNoColor),
 
             _ => throw new ArgumentException($"Unknown glyph value: {glyph}", nameof(glyph)),
         };

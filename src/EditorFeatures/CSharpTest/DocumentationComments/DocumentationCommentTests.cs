@@ -33,6 +33,26 @@ public sealed class DocumentationCommentTests : AbstractDocumentationCommentTest
             }
             """);
 
+    [WpfFact, WorkItem("https://github.com/dotnet/roslyn/issues/78770")]
+    public void TypingCharacter_Extension()
+        => VerifyTypingCharacter("""
+            static class C
+            {
+                //$$
+                extension<T>(int i) { }
+            }
+            """, """
+            static class C
+            {
+                /// <summary>
+                /// $$
+                /// </summary>
+                /// <typeparam name="T"></typeparam>
+                /// <param name="i"></param>
+                extension<T>(int i) { }
+            }
+            """);
+
     [WpfFact]
     public void TypingCharacter_Record()
         => VerifyTypingCharacter("""
@@ -2048,6 +2068,60 @@ public sealed class DocumentationCommentTests : AbstractDocumentationCommentTest
             {
                 /// foo
                 /// $$
+                class C
+                {
+                }
+            }
+            """);
+
+    [WpfFact, WorkItem("https://github.com/dotnet/roslyn/issues/82174")]
+    public void TypingCharacter_ExistingDocCommentLines_DoesNotCorruptDeclaration()
+        => VerifyTypingCharacter("""
+            /// imagine existing content here
+            /// imagine existing content here
+            /// imagine even more existing content here
+            //$$
+            public abstract class Content(
+                string key,
+                int content)
+            {
+            }
+            """, """
+            /// imagine existing content here
+            /// imagine existing content here
+            /// imagine even more existing content here
+            /// <summary>
+            /// $$
+            /// </summary>
+            /// <param name="key"></param>
+            /// <param name="content"></param>
+            public abstract class Content(
+                string key,
+                int content)
+            {
+            }
+            """);
+
+    [WpfFact, WorkItem("https://github.com/dotnet/roslyn/issues/82174")]
+    public void TypingCharacter_ExistingDocCommentLines_Nested_DoesNotCorruptDeclaration()
+        => VerifyTypingCharacter("""
+            namespace N
+            {
+                /// existing doc line 1
+                /// existing doc line 2
+                //$$
+                class C
+                {
+                }
+            }
+            """, """
+            namespace N
+            {
+                /// existing doc line 1
+                /// existing doc line 2
+                /// <summary>
+                /// $$
+                /// </summary>
                 class C
                 {
                 }

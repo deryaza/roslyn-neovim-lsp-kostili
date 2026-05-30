@@ -6,7 +6,6 @@ using System.Collections.Immutable;
 using System.Composition;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.LanguageServer.HostWorkspace.ProjectTelemetry;
-using Microsoft.CodeAnalysis.MSBuild;
 using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.ProjectSystem;
 using Microsoft.CodeAnalysis.Shared.TestHooks;
@@ -14,7 +13,7 @@ using Microsoft.CodeAnalysis.Workspaces.ProjectSystem;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.Composition;
 using Roslyn.Utilities;
-using static Microsoft.CodeAnalysis.MSBuild.BuildHostProcessManager;
+using LSP = Roslyn.LanguageServer.Protocol;
 
 namespace Microsoft.CodeAnalysis.LanguageServer.HostWorkspace;
 
@@ -35,7 +34,8 @@ internal sealed class LanguageServerProjectSystem : LanguageServerProjectLoader
         IAsynchronousOperationListenerProvider listenerProvider,
         ProjectLoadTelemetryReporter projectLoadTelemetry,
         ServerConfigurationFactory serverConfigurationFactory,
-        IBinLogPathProvider binLogPathProvider)
+        IBinLogPathProvider binLogPathProvider,
+        DotnetCliHelper dotnetCliHelper)
             : base(
                 workspaceFactory,
                 fileChangeWatcher,
@@ -44,37 +44,49 @@ internal sealed class LanguageServerProjectSystem : LanguageServerProjectLoader
                 listenerProvider,
                 projectLoadTelemetry,
                 serverConfigurationFactory,
-                binLogPathProvider)
+                binLogPathProvider,
+                dotnetCliHelper)
     {
         _logger = loggerFactory.CreateLogger(nameof(LanguageServerProjectSystem));
         _hostProjectFactory = workspaceFactory.HostProjectFactory;
         var workspace = workspaceFactory.HostWorkspace;
-        _projectFileExtensionRegistry = new ProjectFileExtensionRegistry(workspace.CurrentSolution.Services, new DiagnosticReporter(workspace));
+        _projectFileExtensionRegistry = new ProjectFileExtensionRegistry(new DiagnosticReporter(workspace));
     }
 
-    public async Task OpenSolutionAsync(string solutionFilePath)
+    public async Task OpenSolutionAsync(string solutionFilePath, IProgress<LSP.WorkDoneProgress>? progressReporter = null)
     {
         _logger.LogInformation(string.Format(LanguageServerResources.Loading_0, solutionFilePath));
         _hostProjectFactory.SolutionPath = solutionFilePath;
 
         var (_, projects) = await SolutionFileReader.ReadSolutionFileAsync(solutionFilePath, DiagnosticReportingMode.Throw, CancellationToken.None);
+
+        await using var progressTracker = progressReporter != null && projects.Length > 0
+            ? new WorkDoneProgressTracker(progressReporter, projects.Length)
+            : null;
+
         foreach (var (path, guid) in projects)
         {
-            await BeginLoadingProjectAsync(path, guid);
+            await BeginLoadingProjectAsync(path, guid, progressTracker);
         }
+
         await WaitForProjectsToFinishLoadingAsync();
         await ProjectInitializationHandler.SendProjectInitializationCompleteNotificationAsync();
     }
 
-    public async Task OpenProjectsAsync(ImmutableArray<string> projectFilePaths)
+    public async Task OpenProjectsAsync(ImmutableArray<string> projectFilePaths, IProgress<LSP.WorkDoneProgress>? progressReporter = null)
     {
         if (!projectFilePaths.Any())
             return;
 
+        await using var progressTracker = progressReporter != null && projectFilePaths.Length > 0
+            ? new WorkDoneProgressTracker(progressReporter, projectFilePaths.Length)
+            : null;
+
         foreach (var path in projectFilePaths)
         {
-            await BeginLoadingProjectAsync(path, projectGuid: null);
+            await BeginLoadingProjectAsync(path, projectGuid: null, progressTracker);
         }
+
         await WaitForProjectsToFinishLoadingAsync();
         await ProjectInitializationHandler.SendProjectInitializationCompleteNotificationAsync();
     }
@@ -82,36 +94,25 @@ internal sealed class LanguageServerProjectSystem : LanguageServerProjectLoader
     protected override async Task<RemoteProjectLoadResult?> TryLoadProjectInMSBuildHostAsync(
         BuildHostProcessManager buildHostProcessManager, string projectPath, CancellationToken cancellationToken)
     {
+        Contract.ThrowIfFalse(PathUtilities.IsAbsolute(projectPath));
         if (!_projectFileExtensionRegistry.TryGetLanguageNameFromProjectPath(projectPath, DiagnosticReportingMode.Ignore, out var languageName))
             return null;
 
-        var preferredBuildHostKind = GetKindForProject(projectPath);
+        var preferredBuildHostKind = BuildHostProcessManager.GetKindForProject(projectPath);
         var (buildHost, actualBuildHostKind) = await buildHostProcessManager.GetBuildHostWithFallbackAsync(preferredBuildHostKind, projectPath, cancellationToken);
 
         var loadedFile = await buildHost.LoadProjectFileAsync(projectPath, languageName, cancellationToken);
         return new RemoteProjectLoadResult
         {
-            ProjectFile = loadedFile,
+            ProjectFileInfos = await loadedFile.GetProjectFileInfosAsync(cancellationToken),
+            DiagnosticLogItems = await loadedFile.GetDiagnosticLogItemsAsync(cancellationToken),
+            ProjectRestorePath = projectPath,
             ProjectFactory = _hostProjectFactory,
             IsFileBasedProgram = false,
             IsMiscellaneousFile = false,
+            HasAllInformation = true,
             PreferredBuildHostKind = preferredBuildHostKind,
             ActualBuildHostKind = actualBuildHostKind
         };
-    }
-
-    protected override ValueTask OnProjectUnloadedAsync(string projectFilePath)
-    {
-        // Nothing else to unload for ordinary projects.
-        return ValueTask.CompletedTask;
-    }
-
-    protected override async ValueTask TransitionPrimordialProjectToLoadedAsync(
-        string projectPath,
-        ProjectSystemProjectFactory primordialProjectFactory,
-        ProjectId primordialProjectId,
-        CancellationToken cancellationToken)
-    {
-        throw ExceptionUtilities.Unreachable();
     }
 }

@@ -620,6 +620,10 @@ namespace Microsoft.CodeAnalysis.CSharp
                                 case ConversionKind.ImplicitThrow:
                                     return false;
 
+                                case ConversionKind.Union:
+                                    Debug.Assert(false, "Not expected to survive lowering.");
+                                    return false;
+
                                 default:
                                     // when this assert is hit, examine whether such conversion kind is 
                                     // 1) actually expected to get this far
@@ -689,7 +693,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 if (methodOrIndexer.IsExtensionBlockMember())
                 {
-                    refKind = GetNewExtensionMemberReceiverCaptureRefKind(rewrittenReceiver, methodOrIndexer);
+                    refKind = GetExtensionBlockMemberReceiverCaptureRefKind(rewrittenReceiver, methodOrIndexer);
                 }
                 else
                 {
@@ -946,7 +950,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private RefKind GetNewExtensionMemberReceiverCaptureRefKind(BoundExpression rewrittenReceiver, Symbol methodOrIndexer)
+        private RefKind GetExtensionBlockMemberReceiverCaptureRefKind(BoundExpression rewrittenReceiver, Symbol methodOrIndexer)
         {
             Debug.Assert(rewrittenReceiver.Type is { });
             Debug.Assert(methodOrIndexer.ContainingType.ExtensionParameter is { });

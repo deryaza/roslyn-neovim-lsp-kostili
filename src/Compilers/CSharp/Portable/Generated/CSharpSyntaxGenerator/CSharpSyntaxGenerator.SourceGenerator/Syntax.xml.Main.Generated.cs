@@ -228,6 +228,10 @@ public partial class CSharpSyntaxVisitor<TResult>
     /// <summary>Called when the visitor visits a SpreadElementSyntax node.</summary>
     public virtual TResult? VisitSpreadElement(SpreadElementSyntax node) => this.DefaultVisit(node);
 
+    /// <summary>Called when the visitor visits a WithElementSyntax node.</summary>
+    [Experimental(global::Microsoft.CodeAnalysis.RoslynExperiments.PreviewLanguageFeatureApi, UrlFormat = @"https://github.com/dotnet/roslyn/issues/82210")]
+    public virtual TResult? VisitWithElement(WithElementSyntax node) => this.DefaultVisit(node);
+
     /// <summary>Called when the visitor visits a QueryExpressionSyntax node.</summary>
     public virtual TResult? VisitQueryExpression(QueryExpressionSyntax node) => this.DefaultVisit(node);
 
@@ -509,6 +513,10 @@ public partial class CSharpSyntaxVisitor<TResult>
 
     /// <summary>Called when the visitor visits a StructDeclarationSyntax node.</summary>
     public virtual TResult? VisitStructDeclaration(StructDeclarationSyntax node) => this.DefaultVisit(node);
+
+    /// <summary>Called when the visitor visits a UnionDeclarationSyntax node.</summary>
+    [Experimental(global::Microsoft.CodeAnalysis.RoslynExperiments.PreviewLanguageFeatureApi, UrlFormat = @"https://github.com/dotnet/roslyn/issues/82567")]
+    public virtual TResult? VisitUnionDeclaration(UnionDeclarationSyntax node) => this.DefaultVisit(node);
 
     /// <summary>Called when the visitor visits a InterfaceDeclarationSyntax node.</summary>
     public virtual TResult? VisitInterfaceDeclaration(InterfaceDeclarationSyntax node) => this.DefaultVisit(node);
@@ -972,6 +980,10 @@ public partial class CSharpSyntaxVisitor
     /// <summary>Called when the visitor visits a SpreadElementSyntax node.</summary>
     public virtual void VisitSpreadElement(SpreadElementSyntax node) => this.DefaultVisit(node);
 
+    /// <summary>Called when the visitor visits a WithElementSyntax node.</summary>
+    [Experimental(global::Microsoft.CodeAnalysis.RoslynExperiments.PreviewLanguageFeatureApi, UrlFormat = @"https://github.com/dotnet/roslyn/issues/82210")]
+    public virtual void VisitWithElement(WithElementSyntax node) => this.DefaultVisit(node);
+
     /// <summary>Called when the visitor visits a QueryExpressionSyntax node.</summary>
     public virtual void VisitQueryExpression(QueryExpressionSyntax node) => this.DefaultVisit(node);
 
@@ -1253,6 +1265,10 @@ public partial class CSharpSyntaxVisitor
 
     /// <summary>Called when the visitor visits a StructDeclarationSyntax node.</summary>
     public virtual void VisitStructDeclaration(StructDeclarationSyntax node) => this.DefaultVisit(node);
+
+    /// <summary>Called when the visitor visits a UnionDeclarationSyntax node.</summary>
+    [Experimental(global::Microsoft.CodeAnalysis.RoslynExperiments.PreviewLanguageFeatureApi, UrlFormat = @"https://github.com/dotnet/roslyn/issues/82567")]
+    public virtual void VisitUnionDeclaration(UnionDeclarationSyntax node) => this.DefaultVisit(node);
 
     /// <summary>Called when the visitor visits a InterfaceDeclarationSyntax node.</summary>
     public virtual void VisitInterfaceDeclaration(InterfaceDeclarationSyntax node) => this.DefaultVisit(node);
@@ -1716,6 +1732,10 @@ public partial class CSharpSyntaxRewriter : CSharpSyntaxVisitor<SyntaxNode?>
     public override SyntaxNode? VisitSpreadElement(SpreadElementSyntax node)
         => node.Update(VisitToken(node.OperatorToken), (ExpressionSyntax?)Visit(node.Expression) ?? throw new ArgumentNullException("expression"));
 
+    [Experimental(global::Microsoft.CodeAnalysis.RoslynExperiments.PreviewLanguageFeatureApi, UrlFormat = @"https://github.com/dotnet/roslyn/issues/82210")]
+    public override SyntaxNode? VisitWithElement(WithElementSyntax node)
+        => node.Update(VisitToken(node.WithKeyword), (ArgumentListSyntax?)Visit(node.ArgumentList) ?? throw new ArgumentNullException("argumentList"));
+
     public override SyntaxNode? VisitQueryExpression(QueryExpressionSyntax node)
         => node.Update((FromClauseSyntax?)Visit(node.FromClause) ?? throw new ArgumentNullException("fromClause"), (QueryBodySyntax?)Visit(node.Body) ?? throw new ArgumentNullException("body"));
 
@@ -1996,6 +2016,10 @@ public partial class CSharpSyntaxRewriter : CSharpSyntaxVisitor<SyntaxNode?>
         => node.Update(VisitList(node.AttributeLists), VisitList(node.Modifiers), VisitToken(node.Keyword), VisitToken(node.Identifier), (TypeParameterListSyntax?)Visit(node.TypeParameterList), (ParameterListSyntax?)Visit(node.ParameterList), (BaseListSyntax?)Visit(node.BaseList), VisitList(node.ConstraintClauses), VisitToken(node.OpenBraceToken), VisitList(node.Members), VisitToken(node.CloseBraceToken), VisitToken(node.SemicolonToken));
 
     public override SyntaxNode? VisitStructDeclaration(StructDeclarationSyntax node)
+        => node.Update(VisitList(node.AttributeLists), VisitList(node.Modifiers), VisitToken(node.Keyword), VisitToken(node.Identifier), (TypeParameterListSyntax?)Visit(node.TypeParameterList), (ParameterListSyntax?)Visit(node.ParameterList), (BaseListSyntax?)Visit(node.BaseList), VisitList(node.ConstraintClauses), VisitToken(node.OpenBraceToken), VisitList(node.Members), VisitToken(node.CloseBraceToken), VisitToken(node.SemicolonToken));
+
+    [Experimental(global::Microsoft.CodeAnalysis.RoslynExperiments.PreviewLanguageFeatureApi, UrlFormat = @"https://github.com/dotnet/roslyn/issues/82567")]
+    public override SyntaxNode? VisitUnionDeclaration(UnionDeclarationSyntax node)
         => node.Update(VisitList(node.AttributeLists), VisitList(node.Modifiers), VisitToken(node.Keyword), VisitToken(node.Identifier), (TypeParameterListSyntax?)Visit(node.TypeParameterList), (ParameterListSyntax?)Visit(node.ParameterList), (BaseListSyntax?)Visit(node.BaseList), VisitList(node.ConstraintClauses), VisitToken(node.OpenBraceToken), VisitList(node.Members), VisitToken(node.CloseBraceToken), VisitToken(node.SemicolonToken));
 
     public override SyntaxNode? VisitInterfaceDeclaration(InterfaceDeclarationSyntax node)
@@ -3435,6 +3459,20 @@ public static partial class SyntaxFactory
     /// <summary>Creates a new SpreadElementSyntax instance.</summary>
     public static SpreadElementSyntax SpreadElement(ExpressionSyntax expression)
         => SyntaxFactory.SpreadElement(SyntaxFactory.Token(SyntaxKind.DotDotToken), expression);
+
+    /// <summary>Creates a new WithElementSyntax instance.</summary>
+    [Experimental(global::Microsoft.CodeAnalysis.RoslynExperiments.PreviewLanguageFeatureApi, UrlFormat = @"https://github.com/dotnet/roslyn/issues/82210")]
+    public static WithElementSyntax WithElement(SyntaxToken withKeyword, ArgumentListSyntax argumentList)
+    {
+        if (withKeyword.Kind() != SyntaxKind.WithKeyword) throw new ArgumentException(nameof(withKeyword));
+        if (argumentList == null) throw new ArgumentNullException(nameof(argumentList));
+        return (WithElementSyntax)Syntax.InternalSyntax.SyntaxFactory.WithElement((Syntax.InternalSyntax.SyntaxToken)withKeyword.Node!, (Syntax.InternalSyntax.ArgumentListSyntax)argumentList.Green).CreateRed();
+    }
+
+    /// <summary>Creates a new WithElementSyntax instance.</summary>
+    [Experimental(global::Microsoft.CodeAnalysis.RoslynExperiments.PreviewLanguageFeatureApi, UrlFormat = @"https://github.com/dotnet/roslyn/issues/82210")]
+    public static WithElementSyntax WithElement(ArgumentListSyntax? argumentList = default)
+        => SyntaxFactory.WithElement(SyntaxFactory.Token(SyntaxKind.WithKeyword), argumentList ?? SyntaxFactory.ArgumentList());
 
     /// <summary>Creates a new QueryExpressionSyntax instance.</summary>
     public static QueryExpressionSyntax QueryExpression(FromClauseSyntax fromClause, QueryBodySyntax body)
@@ -5015,6 +5053,33 @@ public static partial class SyntaxFactory
             default: throw new ArgumentException(nameof(semicolonToken));
         }
         return (StructDeclarationSyntax)Syntax.InternalSyntax.SyntaxFactory.StructDeclaration(attributeLists.Node.ToGreenList<Syntax.InternalSyntax.AttributeListSyntax>(), modifiers.Node.ToGreenList<Syntax.InternalSyntax.SyntaxToken>(), (Syntax.InternalSyntax.SyntaxToken)keyword.Node!, (Syntax.InternalSyntax.SyntaxToken)identifier.Node!, typeParameterList == null ? null : (Syntax.InternalSyntax.TypeParameterListSyntax)typeParameterList.Green, parameterList == null ? null : (Syntax.InternalSyntax.ParameterListSyntax)parameterList.Green, baseList == null ? null : (Syntax.InternalSyntax.BaseListSyntax)baseList.Green, constraintClauses.Node.ToGreenList<Syntax.InternalSyntax.TypeParameterConstraintClauseSyntax>(), (Syntax.InternalSyntax.SyntaxToken?)openBraceToken.Node, members.Node.ToGreenList<Syntax.InternalSyntax.MemberDeclarationSyntax>(), (Syntax.InternalSyntax.SyntaxToken?)closeBraceToken.Node, (Syntax.InternalSyntax.SyntaxToken?)semicolonToken.Node).CreateRed();
+    }
+
+    /// <summary>Creates a new UnionDeclarationSyntax instance.</summary>
+    [Experimental(global::Microsoft.CodeAnalysis.RoslynExperiments.PreviewLanguageFeatureApi, UrlFormat = @"https://github.com/dotnet/roslyn/issues/82567")]
+    public static UnionDeclarationSyntax UnionDeclaration(SyntaxList<AttributeListSyntax> attributeLists, SyntaxTokenList modifiers, SyntaxToken keyword, SyntaxToken identifier, TypeParameterListSyntax? typeParameterList, ParameterListSyntax? parameterList, BaseListSyntax? baseList, SyntaxList<TypeParameterConstraintClauseSyntax> constraintClauses, SyntaxToken openBraceToken, SyntaxList<MemberDeclarationSyntax> members, SyntaxToken closeBraceToken, SyntaxToken semicolonToken)
+    {
+        if (keyword.Kind() != SyntaxKind.UnionKeyword) throw new ArgumentException(nameof(keyword));
+        if (identifier.Kind() != SyntaxKind.IdentifierToken) throw new ArgumentException(nameof(identifier));
+        switch (openBraceToken.Kind())
+        {
+            case SyntaxKind.OpenBraceToken:
+            case SyntaxKind.None: break;
+            default: throw new ArgumentException(nameof(openBraceToken));
+        }
+        switch (closeBraceToken.Kind())
+        {
+            case SyntaxKind.CloseBraceToken:
+            case SyntaxKind.None: break;
+            default: throw new ArgumentException(nameof(closeBraceToken));
+        }
+        switch (semicolonToken.Kind())
+        {
+            case SyntaxKind.SemicolonToken:
+            case SyntaxKind.None: break;
+            default: throw new ArgumentException(nameof(semicolonToken));
+        }
+        return (UnionDeclarationSyntax)Syntax.InternalSyntax.SyntaxFactory.UnionDeclaration(attributeLists.Node.ToGreenList<Syntax.InternalSyntax.AttributeListSyntax>(), modifiers.Node.ToGreenList<Syntax.InternalSyntax.SyntaxToken>(), (Syntax.InternalSyntax.SyntaxToken)keyword.Node!, (Syntax.InternalSyntax.SyntaxToken)identifier.Node!, typeParameterList == null ? null : (Syntax.InternalSyntax.TypeParameterListSyntax)typeParameterList.Green, parameterList == null ? null : (Syntax.InternalSyntax.ParameterListSyntax)parameterList.Green, baseList == null ? null : (Syntax.InternalSyntax.BaseListSyntax)baseList.Green, constraintClauses.Node.ToGreenList<Syntax.InternalSyntax.TypeParameterConstraintClauseSyntax>(), (Syntax.InternalSyntax.SyntaxToken?)openBraceToken.Node, members.Node.ToGreenList<Syntax.InternalSyntax.MemberDeclarationSyntax>(), (Syntax.InternalSyntax.SyntaxToken?)closeBraceToken.Node, (Syntax.InternalSyntax.SyntaxToken?)semicolonToken.Node).CreateRed();
     }
 
     /// <summary>Creates a new InterfaceDeclarationSyntax instance.</summary>

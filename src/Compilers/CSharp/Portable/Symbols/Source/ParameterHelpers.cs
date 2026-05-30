@@ -532,7 +532,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             Debug.Assert(extensionMember.IsExtensionBlockMember());
 
             NamedTypeSymbol extension = extensionMember.ContainingType;
-            if (extension.ExtensionParameter is not { } extensionParameter || extension.ContainingType.Arity != 0)
+            if (extension.ExtensionParameter is not { } extensionParameter || extension.ContainingType?.Arity != 0)
             {
                 // error cases, already reported elsewhere
                 return;
@@ -555,7 +555,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 int extensionMemberArity = extensionMember.GetMemberArity();
                 Debug.Assert(extensionMemberArity == 0); // we currently only apply the check for members which may not be generic
 
-                extensionParameter.Type.VisitType(collectTypeParameters, arg: usedTypeParameters);
+                extensionParameter.Type.FindTypeParameters(usedTypeParameters);
 
                 if (usedTypeParameters.Count == extensionArity && extensionMemberArity == 0)
                 {
@@ -564,7 +564,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
                 foreach (var parameter in parameters)
                 {
-                    parameter.Type.VisitType(collectTypeParameters, arg: usedTypeParameters);
+                    parameter.Type.FindTypeParameters(usedTypeParameters);
 
                     if (usedTypeParameters.Count == extensionArity && extensionMemberArity == 0)
                     {
@@ -579,16 +579,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                         diagnostics.Add(ErrorCode.ERR_UnderspecifiedExtension, extensionMember.GetFirstLocation(), typeParameter);
                     }
                 }
-            }
-
-            static bool collectTypeParameters(TypeSymbol type, PooledHashSet<TypeParameterSymbol> typeParameters, bool ignored)
-            {
-                if (type is TypeParameterSymbol typeParameter)
-                {
-                    typeParameters.Add(typeParameter);
-                }
-
-                return false;
             }
         }
 
@@ -608,8 +598,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             bool seenReadonly = false;
 
             SyntaxToken? previousModifier = null;
-            foreach (var modifier in parameter.Modifiers)
+            for (int i = 0, n = parameter.Modifiers.Count; i < n; i++)
             {
+                var modifier = parameter.Modifiers[i];
                 switch (modifier.Kind())
                 {
                     case SyntaxKind.ThisKeyword:
@@ -775,10 +766,27 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
                     case SyntaxKind.ScopedKeyword when parameterContext is not ParameterContext.FunctionPointer:
                         ModifierUtils.CheckScopedModifierAvailability(parameter, modifier, diagnostics);
-                        Debug.Assert(!seenIn);
-                        Debug.Assert(!seenOut);
-                        Debug.Assert(!seenRef);
-                        Debug.Assert(!seenScoped);
+
+                        if (seenScoped)
+                        {
+                            addERR_DupParamMod(diagnostics, modifier);
+                        }
+                        else if (seenIn || seenOut || seenRef || seenReadonly)
+                        {
+                            // Disallow parsing out 'scoped' once in/out/ref/readonly had been seen.
+                            diagnostics.Add(ErrorCode.ERR_ScopedAfterInOutRefReadonly, modifier.GetLocation());
+                        }
+                        else if (i < n - 1)
+                        {
+                            // Only allow `scoped` followed by `ref/out/in` to actually be considered a valid modifier.
+                            // Anything else is an error.
+                            //
+                            // Note we don't add an error in the case of 'scoped scoped' as that is already handled by
+                            // seenScoped above.
+                            var nextModifier = parameter.Modifiers[i + 1];
+                            if (nextModifier.Kind() is not (SyntaxKind.RefKeyword or SyntaxKind.OutKeyword or SyntaxKind.InKeyword or SyntaxKind.ScopedKeyword))
+                                diagnostics.Add(ErrorCode.ERR_InvalidModifierAfterScoped, nextModifier.GetLocation(), nextModifier.Text);
+                        }
 
                         seenScoped = true;
                         break;
@@ -979,6 +987,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
             else if (!conversion.Exists ||
                 conversion.IsUserDefined ||
+                conversion.IsUnion ||
                 conversion.IsIdentity && parameterType.SpecialType == SpecialType.System_Object && defaultExpression.Type.IsDynamic())
             {
                 // If we had no implicit conversion, or a user-defined conversion, report an error.
@@ -1165,7 +1174,6 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                         thisKeyword = modifier;
                         break;
                     case SyntaxKind.ScopedKeyword:
-                        Debug.Assert(refKind == RefKind.None);
                         isScoped = true;
                         break;
                     case SyntaxKind.ReadOnlyKeyword:

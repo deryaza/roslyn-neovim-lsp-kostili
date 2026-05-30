@@ -41,7 +41,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 Debug.Assert(TypeSymbol.Equals(transformedLHS.Type, node.LeftOperand.Type, TypeCompareKind.AllIgnoreOptions));
                 BoundExpression assignment;
 
-                if (IsNewExtensionMemberAccessWithByValPossiblyStructReceiver(transformedLHS))
+                if (IsExtensionBlockMemberAccessWithByValPossiblyStructReceiver(transformedLHS))
                 {
                     // We need to create a tree that ensures that receiver of 'set' is evaluated after the right hand side value
                     BoundLocal rightResult = _factory.StoreToTemp(loweredRight, out BoundAssignmentOperator assignmentToTemp, refKind: RefKind.None);
@@ -59,9 +59,14 @@ namespace Microsoft.CodeAnalysis.CSharp
                 BoundExpression conditionalExpression = MakeNullCoalescingOperator(syntax, lhsRead, assignment, leftPlaceholder: leftPlaceholder, leftConversion: leftPlaceholder, BoundNullCoalescingOperatorResultKind.LeftType, node.LeftOperand.Type);
                 Debug.Assert(conditionalExpression.Type is { });
 
-                return (temps.Count == 0 && stores.Count == 0) ?
-                    conditionalExpression :
-                    new BoundSequence(
+                if (temps.Count == 0 && stores.Count == 0)
+                {
+                    temps.Free();
+                    stores.Free();
+                    return conditionalExpression;
+                }
+
+                return new BoundSequence(
                         syntax,
                         temps.ToImmutableAndFree(),
                         stores.ToImmutableAndFree(),
@@ -86,6 +91,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                                           SpecialMember.System_Nullable_T_GetValueOrDefault,
                                           out var getValueOrDefault))
                 {
+                    temps.Free();
+                    stores.Free();
                     return BadExpression(node);
                 }
 
@@ -94,6 +101,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                                           SpecialMember.System_Nullable_T_get_HasValue,
                                           out var hasValue))
                 {
+                    temps.Free();
+                    stores.Free();
                     return BadExpression(node);
                 }
 

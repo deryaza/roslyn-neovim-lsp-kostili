@@ -10,7 +10,6 @@ using System.IO.Pipelines;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.ErrorReporting;
-using Microsoft.CodeAnalysis.Remote.Host;
 using Microsoft.ServiceHub.Framework;
 using Microsoft.ServiceHub.Framework.Services;
 using Nerdbank.Streams;
@@ -44,7 +43,7 @@ internal abstract partial class BrokeredServiceBase
             object? clientRpcTarget)
             => CreateService(arguments);
 
-        public Task<object> CreateAsync(
+        public async Task<object> CreateAsync(
            Stream stream,
            IServiceProvider hostProvidedServices,
            ServiceActivationOptions serviceActivationOptions,
@@ -67,11 +66,11 @@ internal abstract partial class BrokeredServiceBase
                     CultureInfo.DefaultThreadCurrentCulture = serviceActivationOptions.ClientCulture;
                 }
 
-                return Task.FromResult((object)Create(
+                return (object)Create(
                     stream.UsePipe(),
                     hostProvidedServices,
                     serviceActivationOptions,
-                    serviceBroker));
+                    serviceBroker);
             }
             catch (Exception e) when (FatalError.ReportAndPropagateUnlessCanceled(e))
             {
@@ -90,10 +89,6 @@ internal abstract partial class BrokeredServiceBase
            ServiceActivationOptions serviceActivationOptions,
            IServiceBroker serviceBroker)
         {
-            // Register this service broker globally (if it's the first we encounter) so it can be used by other
-            // global services that need it.
-            RemoteServiceBrokerProvider.RegisterServiceBroker(serviceBroker);
-
             var descriptor = ServiceDescriptors.Instance.GetServiceDescriptorForServiceFactory(typeof(TService));
             var serviceHubTraceSource = (TraceSource?)hostProvidedServices.GetService(typeof(TraceSource));
             var serverConnection = descriptor.WithTraceSource(serviceHubTraceSource).ConstructRpcConnection(pipe);

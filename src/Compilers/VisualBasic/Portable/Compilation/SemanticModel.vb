@@ -927,13 +927,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Return Nothing
             End If
 
-            ' Do not return any type information for a ObjectCreationExpressionSyntax.Type node.
-            If boundNodes.LowestBoundNodeOfSyntacticParent IsNot Nothing AndAlso
-               boundNodes.LowestBoundNodeOfSyntacticParent.Syntax.Kind = SyntaxKind.ObjectCreationExpression AndAlso
-               DirectCast(boundNodes.LowestBoundNodeOfSyntacticParent.Syntax, ObjectCreationExpressionSyntax).Type Is lowestExpr.Syntax Then
-                Return Nothing
-            End If
-
             Dim type As TypeSymbol
 
             ' Similar to a lambda expression, array literal doesn't have a type.
@@ -1130,6 +1123,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         ' the second interpretation applies so just visit the node for that.
                         Dim boundTypeOrValue = DirectCast(boundNodes.LowestBoundNode, BoundTypeOrValueExpression)
                         Dim valueBoundNodes = New BoundNodeSummary(boundTypeOrValue.Data.ValueExpression, boundNodes.HighestBoundNode, boundNodes.LowestBoundNodeOfSyntacticParent)
+                        symbolsBuilder.Free()
+                        memberGroupBuilder.Free()
                         Return GetSemanticSymbols(valueBoundNodes, binderOpt, options, resultKind, memberGroup)
 
                     Case Else

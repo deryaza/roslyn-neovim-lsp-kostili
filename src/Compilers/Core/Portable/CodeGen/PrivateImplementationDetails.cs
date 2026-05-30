@@ -538,7 +538,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
 
         public static string HashToHex(ReadOnlySpan<byte> hash)
         {
-#if NET9_0_OR_GREATER
+#if NET10_0_OR_GREATER
             return string.Create(hash.Length * 2, hash, (destination, hash) => toHex(hash, destination));
 #else
             char[] c = new char[hash.Length * 2];
@@ -734,6 +734,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
 
                 ilBuilder.EmitRet(isVoid: true);
                 ilBuilder.Realize();
+                ilBuilder.FreeBasicBlocks();
 
                 return new Cci.StaticConstructor(containingType, ilBuilder.MaxStack, ilBuilder.RealizedIL);
             }
@@ -1160,6 +1161,7 @@ namespace Microsoft.CodeAnalysis.CodeGen
             // Return.
             ilBuilder.EmitRet(isVoid: false);
             ilBuilder.Realize();
+            ilBuilder.FreeBasicBlocks();
 
             return new BytesToStringHelper(
                 containingType: containingType,

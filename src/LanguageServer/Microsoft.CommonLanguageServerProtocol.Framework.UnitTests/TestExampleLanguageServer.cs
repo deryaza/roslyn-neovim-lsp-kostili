@@ -44,12 +44,12 @@ internal sealed class TestExampleLanguageServer : ExampleLanguageServer
     internal Task ExecuteNotificationAsync(string methodName, CancellationToken _)
         => _clientRpc.NotifyAsync(methodName);
 
-    protected override ILifeCycleManager GetLifeCycleManager()
+    protected override IOnServerShutdown? GetOnServerShutdown()
     {
         return new TestLifeCycleManager(_shuttingDown, _exiting);
     }
 
-    private sealed class TestLifeCycleManager : ILifeCycleManager
+    private sealed class TestLifeCycleManager : IOnServerShutdown
     {
         private readonly TaskCompletionSource<int> _shuttingDownSource;
         private readonly TaskCompletionSource<int> _exitingSource;
@@ -60,16 +60,14 @@ internal sealed class TestExampleLanguageServer : ExampleLanguageServer
             _exitingSource = exitingSource;
         }
 
-        public Task ExitAsync()
+        public async Task ExitAsync()
         {
             _exitingSource.SetResult(0);
-            return Task.CompletedTask;
         }
 
-        public Task ShutdownAsync(string message = "Shutting down")
+        public async Task ShutdownAsync()
         {
             _shuttingDownSource.SetResult(0);
-            return Task.CompletedTask;
         }
     }
 

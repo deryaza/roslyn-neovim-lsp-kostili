@@ -6569,6 +6569,7 @@ End Class";
         }
 
         [Fact]
+        [ValidatePooledObjects(LeakReason = "Tests pass invalid inputs to public API, causing expected ArgumentExceptions that leak pooled objects.")]
         public void CreateTupleTypeSymbol2_VisualBasicElements()
         {
             var vbSource = @"Public Class C
@@ -9074,7 +9075,7 @@ class C
             var typeInfo = model.GetTypeInfo(node);
             Assert.Equal("(System.String, System.String)", typeInfo.Type.ToTestDisplayString());
             Assert.Equal("C.C1", typeInfo.ConvertedType.ToTestDisplayString());
-            Assert.Equal(Conversion.NoConversion, model.GetConversion(node));
+            Assert.False(model.GetConversion(node).Exists);
         }
 
         [Fact]

@@ -52,31 +52,34 @@ try {
   " --exclude net472\Microsoft.VisualStudio.LanguageServices.VisualBasic.dll" +
   " --exclude net472\Roslyn.Hosting.Diagnostics.dll" +
   " --exclude net472\Roslyn.VisualStudio.DiagnosticsWindow.dll" +
+  # Match Roslyn's existing WindowsDesktop VS package exclusions, which still rebuild with output differences.
+  " --exclude net472\Microsoft.VisualStudio.RazorExtension.dll" +
+
 # Rebuilds with compilation errors
 # Rebuilds with missing references
 # Rebuilds with other issues
   " --exclude net472\Microsoft.CodeAnalysis.EditorFeatures2.UnitTests.dll" +
-  " --exclude net9.0\Microsoft.CodeAnalysis.Collections.Package.dll" +
+  " --exclude net10.0\Microsoft.CodeAnalysis.Collections.Package.dll" +
   " --exclude netstandard2.0\Microsoft.CodeAnalysis.Contracts.Package.dll" +
   " --exclude net8.0\Microsoft.CodeAnalysis.Contracts.Package.dll" +
-  " --exclude net9.0\Microsoft.CodeAnalysis.Contracts.Package.dll" +
+  " --exclude net10.0\Microsoft.CodeAnalysis.Contracts.Package.dll" +
   " --exclude netcoreapp3.1\Microsoft.CodeAnalysis.Collections.Package.dll" +
   " --exclude netstandard2.0\Microsoft.CodeAnalysis.Collections.Package.dll" +
   " --exclude netstandard2.0\Microsoft.CodeAnalysis.Debugging.Package.dll" +
   " --exclude netstandard2.0\Microsoft.CodeAnalysis.PooledObjects.Package.dll" +
   " --exclude netstandard2.0\Microsoft.CodeAnalysis.Threading.Package.dll" +
   " --exclude net8.0\Microsoft.CodeAnalysis.Threading.Package.dll" +
-  " --exclude net9.0\Microsoft.CodeAnalysis.Threading.Package.dll" +
+  " --exclude net10.0\Microsoft.CodeAnalysis.Threading.Package.dll" +
   " --exclude netstandard2.0\Microsoft.CodeAnalysis.Extensions.Package.dll" +
   " --exclude netcoreapp3.1\Microsoft.CodeAnalysis.Workspaces.UnitTests.dll" +
 
   # Semantic Search reference assemblies can't be reconstructed from source.
   # The assemblies are not marked with ReferenceAssemblyAttribute attribute.
-  " --exclude net8.0\GeneratedRefAssemblies\Microsoft.CodeAnalysis.dll" +
-  " --exclude net8.0\GeneratedRefAssemblies\Microsoft.CodeAnalysis.CSharp.dll" +
-  " --exclude net8.0\GeneratedRefAssemblies\Microsoft.CodeAnalysis.VisualBasic.dll" +
-  " --exclude net8.0\GeneratedRefAssemblies\Microsoft.CodeAnalysis.SemanticSearch.Extensions.dll" +
-  " --exclude net8.0\GeneratedRefAssemblies\System.Collections.Immutable.dll" +
+  " --exclude net10.0\GeneratedRefAssemblies\Microsoft.CodeAnalysis.dll" +
+  " --exclude net10.0\GeneratedRefAssemblies\Microsoft.CodeAnalysis.CSharp.dll" +
+  " --exclude net10.0\GeneratedRefAssemblies\Microsoft.CodeAnalysis.VisualBasic.dll" +
+  " --exclude net10.0\GeneratedRefAssemblies\Microsoft.CodeAnalysis.SemanticSearch.Extensions.dll" +
+  " --exclude net10.0\GeneratedRefAssemblies\System.Collections.Immutable.dll" +
 
   " --debugPath `"$ArtifactsDir/BuildValidator`"" +
   " --sourcePath `"$RepoRoot/`"" +
