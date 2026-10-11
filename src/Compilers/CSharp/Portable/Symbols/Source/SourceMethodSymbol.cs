@@ -7,6 +7,7 @@ using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Emit;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.PooledObjects;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.Symbols
 {
@@ -95,39 +96,51 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
         /// <summary>
         /// Whether the method has an 'unsafe' modifier.
-        /// For property/event accessors, this includes the containing member's unsafe modifier.
+        /// For event accessors, this comes from the containing member's unsafe modifier
+        /// (the accessor is not allowed to have its own unsafe modifier).
         /// </summary>
         internal abstract bool HasUnsafeModifier { get; }
 
-        internal bool IntroducesUnsafeContext => HasUnsafeModifier && !ContainingModule.UseUpdatedMemorySafetyRules;
-
         /// <summary>
-        /// Whether the method can require callers to be in an unsafe context
-        /// (i.e., can have <see cref="CallerUnsafeMode.Explicit"/>).
+        /// Whether the method has a 'safe' modifier.
+        /// For event accessors, this comes from the containing member's safe modifier
+        /// (the accessor is not allowed to have its own safe modifier).
         /// </summary>
-        internal abstract bool CanBeCallerUnsafe { get; }
+        internal abstract bool HasSafeModifier { get; }
 
-        internal sealed override CallerUnsafeMode CallerUnsafeMode
+        internal bool IntroducesUnsafeContext
         {
             get
             {
-                if (ContainingModule.UseUpdatedMemorySafetyRules)
+                return (HasUnsafeModifier || AssociatedSymbol is SourcePropertySymbolBase { HasUnsafeModifier: true })
+                    && !ContainingModule.UseUpdatedMemorySafetyRules;
+            }
+        }
+
+        /// <summary>
+        /// Whether the method can require callers to be in an unsafe context
+        /// (i.e., can have <see cref="RequiresUnsafeMode.Explicit"/>).
+        /// </summary>
+        internal abstract bool CanRequireUnsafe { get; }
+
+        internal sealed override RequiresUnsafeMode GetRequiresUnsafeMode(ConsList<FieldSymbol> fieldsBeingBound)
+        {
+            if (ContainingModule.UseUpdatedMemorySafetyRules)
+            {
+                Debug.Assert(AssociatedSymbol?.GetRequiresUnsafeMode(fieldsBeingBound) != RequiresUnsafeMode.Implicit);
+
+                if (!CanRequireUnsafe)
                 {
-                    Debug.Assert(AssociatedSymbol?.CallerUnsafeMode != CallerUnsafeMode.Implicit);
-
-                    if (!CanBeCallerUnsafe)
-                    {
-                        return CallerUnsafeMode.None;
-                    }
-
-                    return HasUnsafeModifier || IsExtern || AssociatedSymbol?.CallerUnsafeMode == CallerUnsafeMode.Explicit
-                        ? CallerUnsafeMode.Explicit
-                        : CallerUnsafeMode.None;
+                    return RequiresUnsafeMode.None;
                 }
 
-                return this.HasParameterContainingPointerType() || ReturnType.ContainsPointerOrFunctionPointer()
-                    ? CallerUnsafeMode.Implicit : CallerUnsafeMode.None;
+                return HasUnsafeModifier || (!HasSafeModifier && AssociatedSymbol?.GetRequiresUnsafeMode(fieldsBeingBound) == RequiresUnsafeMode.Explicit)
+                    ? RequiresUnsafeMode.Explicit
+                    : RequiresUnsafeMode.None;
             }
+
+            return this.HasParameterContainingPointerType() || ReturnType.ContainsPointerOrFunctionPointer()
+                ? RequiresUnsafeMode.Implicit : RequiresUnsafeMode.None;
         }
 
         internal override bool HasAsyncMethodBuilderAttribute(out TypeSymbol? builderArgument)
@@ -152,7 +165,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
 
             var compilation = target.DeclaringCompilation;
 
-            if (target.CallerUnsafeMode == CallerUnsafeMode.Explicit)
+            if (target.GetRequiresUnsafeMode(ConsList<FieldSymbol>.Empty) == RequiresUnsafeMode.Explicit)
             {
                 AddSynthesizedAttribute(ref attributes, moduleBuilder.TrySynthesizeRequiresUnsafeAttribute());
             }
@@ -178,7 +191,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 // only emitting metadata the method body will not have been rewritten, and the async state machine
                 // type will not have been created. In this case, omit the attribute.
 
-                if (moduleBuilder.CompilationState.TryGetStateMachineType(target, out NamedTypeSymbol? stateMachineType))
+                if (moduleBuilder.CompilationState.TryGetStateMachineType(target.PartialImplementationPart ?? target, out NamedTypeSymbol? stateMachineType))
                 {
                     var arg = new TypedConstant(compilation.GetWellKnownType(WellKnownType.System_Type),
                         TypedConstantKind.Type, stateMachineType.GetUnboundGenericTypeOrSelf());

@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Razor;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Razor;
-using Microsoft.CodeAnalysis.ExternalAccess.Razor;
 using Microsoft.CodeAnalysis.Razor.Cohost;
 using Microsoft.CodeAnalysis.Razor.Logging;
 using Microsoft.CodeAnalysis.Razor.Protocol.CodeActions;
@@ -53,7 +52,7 @@ internal sealed class HtmlRequestInvoker(
             return default;
         }
 
-        var existingChecksum = (ChecksumWrapper)htmlDocument.State.AssumeNotNull();
+        var existingChecksum = (Checksum)htmlDocument.State.AssumeNotNull();
         if (!existingChecksum.Equals(syncResult.Checksum))
         {
             _logger.LogError($"Checksum for {snapshot.Uri}, {htmlDocument.State} doesn't match {syncResult.Checksum}.");
@@ -99,8 +98,6 @@ internal sealed class HtmlRequestInvoker(
         var textDocument = request switch
         {
             ITextDocumentParams textDocumentParams => textDocumentParams.TextDocument,
-            // VSInternalDiagnosticParams doesn't implement the interface because the TextDocument property is nullable
-            VSInternalDiagnosticParams vsInternalDiagnosticParams => vsInternalDiagnosticParams.TextDocument,
             VSCodeActionParams vsCodeActionParams => vsCodeActionParams.TextDocument,
             _ => null
         };

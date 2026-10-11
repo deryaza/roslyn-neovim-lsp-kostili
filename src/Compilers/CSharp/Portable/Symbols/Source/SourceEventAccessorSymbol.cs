@@ -195,7 +195,8 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             => ImmutableArray<TypeParameterConstraintKind>.Empty;
 
         internal sealed override bool HasUnsafeModifier => (DeclarationModifiers & DeclarationModifiers.Unsafe) != 0;
-        internal sealed override bool CanBeCallerUnsafe => true;
+        internal sealed override bool HasSafeModifier => (DeclarationModifiers & DeclarationModifiers.Safe) != 0;
+        internal sealed override bool CanRequireUnsafe => true;
 
         internal Location Location
         {

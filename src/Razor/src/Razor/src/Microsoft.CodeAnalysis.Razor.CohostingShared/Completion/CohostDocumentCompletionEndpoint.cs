@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Razor;
 using Microsoft.AspNetCore.Razor.PooledObjects;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.ExternalAccess.Razor.Features;
+using Microsoft.CodeAnalysis.Razor.CohostingShared;
 using Microsoft.CodeAnalysis.LanguageServer.Handler;
 using Microsoft.CodeAnalysis.Razor.Cohost;
 using Microsoft.CodeAnalysis.Razor.Completion;
@@ -239,7 +239,7 @@ internal sealed class CohostDocumentCompletionEndpoint(
 
         var rewrittenResponse = DelegatedCompletionHelper.RewriteHtmlResponse(result, razorCompletionOptions);
 
-        var resolutionContext = new DelegatedCompletionResolutionContext(RazorLanguageKind.Html, rewrittenResponse.Data ?? rewrittenResponse.ItemDefaults?.Data, ProvisionalTextEdit: null);
+        var resolutionContext = new DelegatedCompletionResolutionContext(RazorLanguageKind.Html, rewrittenResponse.Data ?? rewrittenResponse.ItemDefaults?.Data, ProvisionalTextEdit: null, InDeclDocument: false);
         var resultId = _completionListCache.Add(rewrittenResponse, resolutionContext);
         rewrittenResponse.SetResultId(resultId, _clientCapabilitiesService.ClientCapabilities);
 
@@ -297,8 +297,11 @@ internal sealed class CohostDocumentCompletionEndpoint(
         }
         else
         {
-            // There were Html completion items, so combine them with our snippet list
-            completionList.Items = [.. snippetCompletionList.Items, .. completionList.Items];
+            // There were Html completion items, so combine them with our snippet list without
+            // mutating the original list, which may be shared with another request.
+            completionList = new RazorVSInternalCompletionList(
+                completionList,
+                [.. snippetCompletionList.Items, .. completionList.Items]);
         }
 
         return completionList;
@@ -313,5 +316,13 @@ internal sealed class CohostDocumentCompletionEndpoint(
             TextDocument razorDocument,
             CancellationToken cancellationToken)
                 => instance.HandleRequestAsync(request, razorDocument, cancellationToken);
+
+        public RazorVSInternalCompletionList? AddSnippets(
+            RazorVSInternalCompletionList? completionList,
+            RazorLanguageKind languageKind,
+            string? triggerCharacter,
+            bool isStartTagContext,
+            RazorCompletionOptions options)
+                => instance.AddSnippets(completionList, languageKind, triggerCharacter, isStartTagContext, options);
     }
 }

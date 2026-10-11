@@ -7,6 +7,9 @@ using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis.EditAndContinue;
+using Microsoft.CodeAnalysis.ExternalAccess.TestDiscovery.Contracts;
+using Microsoft.CodeAnalysis.ExternalAccess.TestDiscovery.Internal;
+using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.LanguageServer.BrokeredServices;
 using Microsoft.CodeAnalysis.LanguageServer.BrokeredServices.Services;
 using Microsoft.CodeAnalysis.LanguageServer.BrokeredServices.Services.BrokeredServiceBridgeManifest;
@@ -18,12 +21,15 @@ using Microsoft.VisualStudio.Shell.ServiceBroker;
 using Microsoft.VisualStudio.Utilities.ServiceBroker;
 using Nerdbank.Streams;
 using Xunit.Abstractions;
-using DebuggerContracts = Microsoft.VisualStudio.Debugger.Contracts.HotReload;
 
 namespace Microsoft.CodeAnalysis.LanguageServer.UnitTests;
 
+/// <summary>
+/// These tests verify specifics around LSP service MEF lifetimes and availability, so utilize the real
+/// MEF composition via <see cref="AbstractLanguageServerMefHost"/> 
+/// </summary>
 public sealed class ServiceBrokerFactoryTests(ITestOutputHelper testOutputHelper)
-    : AbstractLanguageServerHostTests(testOutputHelper)
+    : AbstractLanguageServerMefHost(testOutputHelper)
 {
     private const string ServiceBrokerConnectMethodName = "serviceBroker/connect";
     private const string ServiceBrokerChannelName = "serviceBroker";
@@ -32,10 +38,28 @@ public sealed class ServiceBrokerFactoryTests(ITestOutputHelper testOutputHelper
     private static readonly TimeSpan s_timeout = TimeSpan.FromSeconds(30);
 
     [Fact]
-    public async Task ServiceBrokerFactoryIsManagedPerServerAsync()
+    public async Task ServiceBrokerFactoryAndTelemetryAreManagedPerServerAsync()
     {
-        var server1 = await CreateLanguageServerAsync();
-        var server2 = await CreateLanguageServerAsync();
+        var serverTelemetry1 = new RoslynTelemetry();
+        var serverTelemetry2 = new RoslynTelemetry();
+        var projectLoadCompleted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var serverEvents1 = new RecordingEventSink(onLog: functionId =>
+        {
+            if (functionId == FunctionId.VSCode_Projects_Load_Completed)
+                projectLoadCompleted.TrySetResult(true);
+        });
+        var serverEvents2 = new RecordingEventSink();
+        using var registration1 = serverTelemetry1.AddEventSink(serverEvents1);
+        using var registration2 = serverTelemetry2.AddEventSink(serverEvents2);
+
+        TestLspServer server1;
+        using (RoslynTelemetry.SetCurrent(serverTelemetry1))
+            server1 = await CreateLanguageServerAsync();
+
+        TestLspServer server2;
+        using (RoslynTelemetry.SetCurrent(serverTelemetry2))
+            server2 = await CreateLanguageServerAsync();
+
         var server1Disposed = false;
 
         await using var brokeredServiceClient1 = new TestBrokeredServiceClient();
@@ -43,29 +67,54 @@ public sealed class ServiceBrokerFactoryTests(ITestOutputHelper testOutputHelper
 
         try
         {
-            var serviceBrokerFactory1 = server1.LanguageServerHost.GetRequiredLspService<ServiceBrokerFactory>();
-            var serviceBrokerFactory2 = server2.LanguageServerHost.GetRequiredLspService<ServiceBrokerFactory>();
+            var serviceBrokerFactory1 = server1.GetRequiredLspService<ServiceBrokerFactory>();
+            var serviceBrokerFactory2 = server2.GetRequiredLspService<ServiceBrokerFactory>();
 
+            // Each language server owns a distinct stateful broker factory.
             Assert.NotSame(serviceBrokerFactory1, serviceBrokerFactory2);
 
             await brokeredServiceClient1.ConnectAsync(server1);
             await brokeredServiceClient2.ConnectAsync(server2);
 
-            Assert.Same(serviceBrokerFactory1, server1.LanguageServerHost.GetRequiredLspService<ServiceBrokerFactory>());
-            Assert.Same(serviceBrokerFactory2, server2.LanguageServerHost.GetRequiredLspService<ServiceBrokerFactory>());
+            Assert.Same(serviceBrokerFactory1, server1.GetRequiredLspService<ServiceBrokerFactory>());
+            Assert.Same(serviceBrokerFactory2, server2.GetRequiredLspService<ServiceBrokerFactory>());
 
             var workspaceProjectFactory1 = await GetRequiredServiceAsync<IWorkspaceProjectFactoryService>(brokeredServiceClient1.ServiceBroker, WorkspaceProjectFactoryServiceDescriptor.ServiceDescriptor, CancellationToken.None);
             var workspaceProjectFactory2 = await GetRequiredServiceAsync<IWorkspaceProjectFactoryService>(brokeredServiceClient2.ServiceBroker, WorkspaceProjectFactoryServiceDescriptor.ServiceDescriptor, CancellationToken.None);
 
             Assert.NotNull(await workspaceProjectFactory1.GetSupportedBuildSystemPropertiesAsync(CancellationToken.None));
             Assert.NotNull(await workspaceProjectFactory2.GetSupportedBuildSystemPropertiesAsync(CancellationToken.None));
+
+            // Each bridge resolves a distinct workspace project service from its owning server.
             Assert.NotSame(workspaceProjectFactory1, workspaceProjectFactory2);
+
+            // Broker calls run under the owning server's telemetry rather than the test caller's ambient.
+            Assert.NotSame(serverTelemetry1, RoslynTelemetry.Current);
+            Assert.NotSame(serverTelemetry2, RoslynTelemetry.Current);
+
+            using var workspaceProject = await workspaceProjectFactory1.CreateAndAddProjectAsync(
+                new WorkspaceProjectCreationInfo(LanguageNames.CSharp, "DisplayName", FilePath: null, new Dictionary<string, string>()),
+                CancellationToken.None);
+
+            // Project creation reports its start event only to the first server.
+            Assert.Contains(FunctionId.VSCode_Project_Load_Started, serverEvents1.Events);
+            Assert.DoesNotContain(FunctionId.VSCode_Project_Load_Started, serverEvents2.Events);
+
+            var observer = await brokeredServiceClient1.InitializationObserver.WaitAsync(s_timeout);
+            Assert.DoesNotContain(FunctionId.VSCode_Projects_Load_Completed, serverEvents1.Events);
+            observer.OnNext(new ProjectInitializationCompletionState { EnvironmentStateVersion = 1, ProjectsLoadedCount = 1 });
+            await projectLoadCompleted.Task;
+
+            // The asynchronous initialization callback reports completion only to the first server.
+            Assert.Contains(FunctionId.VSCode_Projects_Load_Completed, serverEvents1.Events);
+            Assert.DoesNotContain(FunctionId.VSCode_Projects_Load_Completed, serverEvents2.Events);
 
             await server1.DisposeAsync();
             server1Disposed = true;
             // Now that the server is disposed, the client connection should close.
             await brokeredServiceClient1.Connection;
 
+            // Disposing the first server leaves the second broker connection usable.
             Assert.False(brokeredServiceClient2.Connection.IsCompleted);
             Assert.NotNull(await workspaceProjectFactory2.GetSupportedBuildSystemPropertiesAsync(CancellationToken.None));
         }
@@ -81,7 +130,7 @@ public sealed class ServiceBrokerFactoryTests(ITestOutputHelper testOutputHelper
     }
 
     [Fact]
-    public async Task ManagedHotReloadLanguageServiceIsAvailableAsync()
+    public async Task ManagedHotReloadLanguageServiceIsAdvertisedAsync()
     {
         await using var server = await CreateLanguageServerAsync();
         await using var brokeredServiceClient = new TestBrokeredServiceClient();
@@ -89,13 +138,7 @@ public sealed class ServiceBrokerFactoryTests(ITestOutputHelper testOutputHelper
         await brokeredServiceClient.ConnectAsync(server);
 
         var serverServices = await GetAvailableServerServicesAsync(brokeredServiceClient.ServiceBroker, CancellationToken.None);
-        Assert.Contains(ManagedHotReloadLanguageServiceDescriptor.Descriptor.Moniker, serverServices);
-
-        var languageService = await GetRequiredServiceAsync<DebuggerContracts.IManagedHotReloadLanguageService3>(
-            brokeredServiceClient.ServiceBroker,
-            ManagedHotReloadLanguageServiceDescriptor.Descriptor,
-            CancellationToken.None);
-        Assert.NotNull(languageService);
+        Assert.Contains(ManagedHotReloadUpdatesProviderDescriptor.Moniker, serverServices);
     }
 
     [Fact]
@@ -104,6 +147,61 @@ public sealed class ServiceBrokerFactoryTests(ITestOutputHelper testOutputHelper
         var pipeName = NamedPipeTestUtilities.CreateShortPipeName("rsb-");
 
         Assert.InRange((HelixUnixPipePathPrefix + pipeName).Length, 1, MacOSUnixDomainSocketMaxPathLength);
+    }
+
+    [Fact]
+    public void ServicesToRegister_AdvertisesServiceMoniker_WhenImplementationPresent()
+    {
+        var service = new FakeTestDiscoveryLanguageService();
+        var contributor = new TestDiscoveryServiceContributor(() => service);
+
+        var servicesToRegister = contributor.ServicesToRegister;
+
+        Assert.Single(servicesToRegister);
+        Assert.True(servicesToRegister.ContainsKey(service.Descriptor.Moniker));
+    }
+
+    [Fact]
+    public void ServicesToRegister_IsEmpty_WhenImplementationAbsent()
+    {
+        var contributor = new TestDiscoveryServiceContributor(() => null);
+
+        Assert.Empty(contributor.ServicesToRegister);
+    }
+
+    [Fact]
+    public void Proffer_DoesNothing_WhenImplementationAbsent()
+    {
+        var container = new TestBrokeredServiceContainer(new TraceSource(nameof(TestBrokeredServiceContainer)));
+        var contributor = new TestDiscoveryServiceContributor(() => null);
+
+        // Should be a no-op (and must not throw) when there is no implementation to proffer.
+        contributor.Proffer(container);
+    }
+
+    [Fact]
+    public async Task ProfferedService_IsAcquirable_AndInitializeIsInvoked()
+    {
+        var service = new FakeTestDiscoveryLanguageService();
+        var contributor = new TestDiscoveryServiceContributor(() => service);
+
+        var container = new TestBrokeredServiceContainer(new TraceSource(nameof(TestBrokeredServiceContainer)));
+
+        // Mirror the production ordering performed by BrokeredServiceContainer.CreateAsync /
+        // ServiceBrokerFactory.CreateAsync: register the advertised monikers, then proffer.
+        container.RegisterServices(contributor.ServicesToRegister);
+        contributor.Proffer(container);
+
+        // The proffered moniker is advertised and serviceable: acquiring a proxy via the implementation's
+        // descriptor runs the proffer factory callback, which invokes InitializeAsync before handing back
+        // the proffered instance. Invoking an RPC method then round-trips to that instance.
+        var proxy = await GetRequiredServiceAsync<IFakeTestDiscoveryRpc>(
+            container.GetFullAccessServiceBroker(), service.Descriptor, CancellationToken.None);
+
+        await service.InitializeCalled.Task.WaitAsync(CancellationToken.None);
+        Assert.Equal(1, service.InitializeCallCount);
+
+        Assert.Equal("pong", await proxy.PingAsync(CancellationToken.None));
     }
 
     private static async Task<IReadOnlyCollection<ServiceMoniker>> GetAvailableServerServicesAsync(IServiceBroker serviceBroker, CancellationToken cancellationToken)
@@ -133,7 +231,12 @@ public sealed class ServiceBrokerFactoryTests(ITestOutputHelper testOutputHelper
         private readonly TestBrokeredServiceContainer _container = new(new TraceSource(nameof(TestBrokeredServiceClient)));
         private readonly NamedPipeServerStream _pipeStream;
         private readonly string _pipeName;
+        private readonly TaskCompletionSource<IObserver<ProjectInitializationCompletionState>> _initializationObserverSource =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
         private Task? _connectionTask;
+
+        /// <summary>The observer the server subscribed with, so a test can drive Dev Kit's completion callback.</summary>
+        public Task<IObserver<ProjectInitializationCompletionState>> InitializationObserver => _initializationObserverSource.Task;
 
         public TestBrokeredServiceClient()
         {
@@ -206,7 +309,7 @@ public sealed class ServiceBrokerFactoryTests(ITestOutputHelper testOutputHelper
 
             _container.Proffer(
                 Descriptors.RemoteProjectInitializationStatusService,
-                (moniker, options, serviceBroker, cancellationToken) => new ValueTask<object?>(new TestProjectInitializationStatusService()));
+                (moniker, options, serviceBroker, cancellationToken) => new ValueTask<object?>(new TestProjectInitializationStatusService(_initializationObserverSource)));
         }
 
         /// <summary>
@@ -292,10 +395,47 @@ public sealed class ServiceBrokerFactoryTests(ITestOutputHelper testOutputHelper
             => base.UnregisterServices(services);
     }
 
-    private sealed class TestProjectInitializationStatusService : IProjectInitializationStatusService
+    private sealed class TestProjectInitializationStatusService(
+        TaskCompletionSource<IObserver<ProjectInitializationCompletionState>> observerSource) : IProjectInitializationStatusService
     {
         public ValueTask<IDisposable> SubscribeInitializationCompletionAsync(IObserver<ProjectInitializationCompletionState> observer, CancellationToken cancellationToken)
-            => ValueTask.FromResult<IDisposable>(new EmptyDisposable());
+        {
+            observerSource.TrySetResult(observer);
+            return ValueTask.FromResult<IDisposable>(new EmptyDisposable());
+        }
+    }
+
+    /// <summary>
+    /// Fake RPC surface standing in for the rich, closed-source discovery contract defined in C# Dev Kit.
+    /// Roslyn never references this interface; it is used here only to prove that the proffered service is
+    /// reachable over the service broker.
+    /// </summary>
+    private interface IFakeTestDiscoveryRpc
+    {
+        Task<string> PingAsync(CancellationToken cancellationToken);
+    }
+
+    private sealed class FakeTestDiscoveryLanguageService : ITestDiscoveryLanguageService, IFakeTestDiscoveryRpc
+    {
+        public TaskCompletionSource InitializeCalled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int InitializeCallCount { get; private set; }
+
+        public ServiceRpcDescriptor Descriptor { get; } = new ServiceJsonRpcDescriptor(
+            new ServiceMoniker("Microsoft.VisualStudio.CSharpDevKit.SourceTestDiscoveryService", new Version(0, 1)),
+            ServiceJsonRpcDescriptor.Formatters.MessagePack,
+            ServiceJsonRpcDescriptor.MessageDelimiters.BigEndianInt32LengthHeader)
+            .WithExceptionStrategy(StreamJsonRpc.ExceptionProcessing.ISerializable);
+
+        public Task InitializeAsync(IServiceBroker serviceBroker, CancellationToken cancellationToken)
+        {
+            InitializeCallCount++;
+            InitializeCalled.TrySetResult();
+            return Task.CompletedTask;
+        }
+
+        public Task<string> PingAsync(CancellationToken cancellationToken)
+            => Task.FromResult("pong");
     }
 
     private sealed class TestAuthorizationService : IAuthorizationService

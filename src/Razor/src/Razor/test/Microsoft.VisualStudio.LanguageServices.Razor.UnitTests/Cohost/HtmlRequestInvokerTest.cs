@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Razor;
 using Microsoft.AspNetCore.Razor.Test.Common.Editor;
 using Microsoft.AspNetCore.Razor.Test.Common.VisualStudio;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.ExternalAccess.Razor;
 using Microsoft.CodeAnalysis.LanguageServer;
 using Microsoft.CodeAnalysis.Razor;
 using Microsoft.CodeAnalysis.Razor.Protocol.CodeActions;
@@ -42,18 +41,18 @@ public class HtmlRequestInvokerTest(ITestOutputHelper testOutput) : VisualStudio
         var htmlDocumentUri = new Uri("file://File.razor.html", UriKind.Absolute);
         var requestValidator = (object request) =>
         {
-            var diagnosticParams = Assert.IsType<VSInternalDiagnosticParams>(request);
-            Assert.Equal(htmlDocumentUri, diagnosticParams.TextDocument!.DocumentUri.GetRequiredSystemUri());
+            var diagnosticParams = Assert.IsType<DocumentDiagnosticParams>(request);
+            Assert.Equal(htmlDocumentUri, diagnosticParams.TextDocument.DocumentUri.GetRequiredSystemUri());
         };
 
-        var diagnosticRequest = new VSInternalDiagnosticParams
+        var diagnosticRequest = new DocumentDiagnosticParams
         {
             TextDocument = new TextDocumentIdentifier { DocumentUri = document.GetURI() }
         };
 
-        await MakeHtmlRequestAsync(document, htmlDocumentUri, requestValidator, VSInternalMethods.DocumentPullDiagnosticName, diagnosticRequest);
+        await MakeHtmlRequestAsync(document, htmlDocumentUri, requestValidator, Methods.TextDocumentDiagnosticName, diagnosticRequest);
 
-        Assert.Equal(document.GetURI(), diagnosticRequest.TextDocument!.DocumentUri);
+        Assert.Equal(document.GetURI(), diagnosticRequest.TextDocument.DocumentUri);
     }
 
     [Fact]
@@ -107,7 +106,7 @@ public class HtmlRequestInvokerTest(ITestOutputHelper testOutput) : VisualStudio
     {
         var htmlTextSnapshot = new StringTextSnapshot("");
         var htmlTextBuffer = new TestTextBuffer(htmlTextSnapshot);
-        var checksum = await document.GetChecksumAsync(DisposalToken);
+        var checksum = await document.State.GetChecksumAsync(DisposalToken);
         var requestInvoker = new TestLSPRequestInvoker((method, null));
         var lspDocumentManager = new TestDocumentManager();
         var htmlVirtualDocument = new HtmlVirtualDocumentSnapshot(htmlDocumentUri, htmlTextBuffer.CurrentSnapshot, hostDocumentSyncVersion: 1, state: checksum);
@@ -137,9 +136,14 @@ public class HtmlRequestInvokerTest(ITestOutputHelper testOutput) : VisualStudio
 
     private class RemoteServiceInvoker : IRemoteServiceInvoker
     {
-        public ValueTask<TResult?> TryInvokeAsync<TService, TResult>(Solution solution, Func<TService, RazorPinnedSolutionInfoWrapper, CancellationToken, ValueTask<TResult>> invocation, CancellationToken cancellationToken, [CallerFilePath] string? callerFilePath = null, [CallerMemberName] string? callerMemberName = null) where TService : class
+        public ValueTask<TResult?> TryInvokeAsync<TService, TResult>(Solution solution, Func<TService, RazorSolutionWrapper, CancellationToken, ValueTask<TResult>> invocation, CancellationToken cancellationToken, [CallerFilePath] string? callerFilePath = null, [CallerMemberName] string? callerMemberName = null) where TService : class
         {
             return new((TResult?)(object)"");
+        }
+
+        public ValueTask<TResult?> TryInvokeAsync<TService, TResult>(Func<TService, CancellationToken, ValueTask<TResult>> invocation, CancellationToken cancellationToken, [CallerFilePath] string? callerFilePath = null, [CallerMemberName] string? callerMemberName = null) where TService : class
+        {
+            throw new NotImplementedException();
         }
     }
 }

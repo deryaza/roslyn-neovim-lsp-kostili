@@ -2,9 +2,10 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using Microsoft.CodeAnalysis.BrokeredServices;
 using Microsoft.CodeAnalysis.LanguageServer.BrokeredServices;
+using Microsoft.CodeAnalysis.LanguageServer.Handler;
 using Microsoft.CodeAnalysis.LanguageServer.HostWorkspace;
+using Microsoft.CodeAnalysis.LanguageServer.Telemetry;
 using Microsoft.CodeAnalysis.Remote.ProjectSystem;
 using Microsoft.Extensions.Logging;
 using Xunit.Abstractions;
@@ -18,22 +19,25 @@ public sealed class WorkspaceProjectFactoryServiceTests(ITestOutputHelper testOu
     public async Task CreateProjectAndBatch()
     {
         var loggerFactory = new LoggerFactory();
-        var (exportProvider, _) = await LanguageServerTestComposition.CreateExportProviderAsync(
-            loggerFactory, includeDevKitComponents: false, MefCacheDirectory.Path, []);
-        using var _ = exportProvider;
+        await using var testLspServer = await CreateLanguageServerAsync(serverConfiguration: ServerConfigurationWithoutDevKit);
 
-        var workspaceFactory = exportProvider.GetExportedValue<LanguageServerWorkspaceFactory>();
-
-        var serviceBrokerInitializers = exportProvider.GetExports<IServiceBrokerInitializer>().Select(e => e.Value);
-        var serviceBrokerFactory = new ServiceBrokerFactory(serviceBrokerInitializers, exportProvider, loggerFactory);
+        var workspaceFactory = testLspServer.GetRequiredLspService<LanguageServerWorkspaceFactory>();
+        var serviceBrokerFactory = testLspServer.GetRequiredLspService<ServiceBrokerFactory>();
+        var projectTargetFrameworkManager = testLspServer.GetRequiredLspService<ProjectTargetFrameworkManager>();
+        var clientLanguageServerManager = testLspServer.GetRequiredLspService<IClientLanguageServerManager>();
+        var requestTelemetryLogger = (VSCodeRequestTelemetryLogger)testLspServer.GetRequiredLspService<RequestTelemetryLogger>();
         var container = await serviceBrokerFactory.CreateAsync(workspaceFactory.HostWorkspace);
 
         var workspaceProjectFactoryService = new WorkspaceProjectFactoryService(
             workspaceFactory,
+            projectTargetFrameworkManager,
             new ProjectInitializationHandler(
+                clientLanguageServerManager,
                 container.GetFullAccessServiceBroker(),
-                loggerFactory),
-            loggerFactory);
+                loggerFactory,
+                requestTelemetryLogger),
+            loggerFactory,
+            requestTelemetryLogger);
         using var workspaceProject = await workspaceProjectFactoryService.CreateAndAddProjectAsync(
             new WorkspaceProjectCreationInfo(LanguageNames.CSharp, "DisplayName", FilePath: null, new Dictionary<string, string>()),
             CancellationToken.None);

@@ -25,6 +25,7 @@ pr:
     - release/*
     - features/*
     - demos/*
+    - dev/*
     exclude:
     # Since the version of VS on the integration VM images are a moving target,
     # we are unable to reliably run integration tests on servicing branches.
@@ -36,6 +37,8 @@ pr:
       - docs/*
       - eng/config/OptProf.json
       - eng/config/PublishData.json
+      - eng/pipelines/insert.yml
+      - eng/pipelines/insertion-pr-tagger.yml
       - eng/setup-pr-validation.ps1
       - .vscode/*
       - .github/*
@@ -47,9 +50,7 @@ pr:
       - azure-pipelines-integration-scouting.yml
       - azure-pipelines-official.yml
       - azure-pipelines-pr-validation.yml
-      - CODE-OF-CONDUCT.md
-      - CONTRIBUTING.md
-      - README.md
+      - '*.md'
       - src/Compilers/*
       - src/LanguageServer/Microsoft.CommonLanguageServerProtocol.Framework/README.md
 
@@ -94,6 +95,7 @@ stages:
     buildQueueName: ${{ parameters.buildQueueName }}
     timeout: ${{ parameters.timeout }}
     configuration: Debug
+    warnAsError: true
     testRuns:
       - ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
         - oop64bit: false
@@ -110,6 +112,7 @@ stages:
     buildQueueName: ${{ parameters.buildQueueName }}
     timeout: ${{ parameters.timeout }}
     configuration: Release
+    warnAsError: true
     testRuns:
       - oop64bit: false
         lspEditor: false

@@ -572,7 +572,11 @@ internal static class TagHelperBlockRewriter
             if (_tryParseResult.IsBoundNonStringAttribute && CanBeCollapsed(node))
             {
                 using var builder = new PooledArrayBuilder<SyntaxToken>();
-                builder.AddRange(node.DescendantTokens());
+
+                foreach (var token in node.DescendantTokens())
+                {
+                    builder.Add(token);
+                }
 
                 var tokens = builder.ToList();
 
@@ -733,6 +737,12 @@ internal static class TagHelperBlockRewriter
         }
 
         public override SyntaxNode VisitRazorUsingDirective(RazorUsingDirectiveSyntax node)
+        {
+            // We don't support directives inside tag helper attributes. Don't rewrite anything inside a directive.
+            return node;
+        }
+
+        public override SyntaxNode VisitRazorDocumentationDirective(RazorDocumentationDirectiveSyntax node)
         {
             // We don't support directives inside tag helper attributes. Don't rewrite anything inside a directive.
             return node;

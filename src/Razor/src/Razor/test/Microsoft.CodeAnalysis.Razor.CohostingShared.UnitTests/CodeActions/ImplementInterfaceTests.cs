@@ -1,9 +1,9 @@
-// Licensed to the .NET Foundation under one or more agreements.
+﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Razor.Language;
-using Microsoft.CodeAnalysis.ExternalAccess.Razor;
+using Microsoft.CodeAnalysis.CodeFixes;
 using Roslyn.Test.Utilities;
 using Xunit;
 using Xunit.Abstractions;
@@ -41,7 +41,47 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionIndex: 0,
+            makeDiagnosticsRequest: true);
+    }
+
+    [Fact]
+    public async Task ImplementInterface_ExistingCodeBlock_UsesEditorConfig()
+    {
+        await VerifyCodeActionAsync(
+            input: """
+                @implements IMyInter[||]face
+
+                @code {
+                }
+                """,
+            expected: """
+                @implements IMyInterface
+
+                @code {
+                    public void M ()
+                    {
+                        throw new NotImplementedException();
+                    }
+                }
+                """,
+            additionalFiles:
+            [
+                (".editorconfig", """
+                    root = true
+
+                    [*.razor]
+                    csharp_space_between_method_declaration_name_and_open_parenthesis = true
+                    """),
+                (FilePath("IMyInterface.cs"), """
+                    public interface IMyInterface
+                    {
+                        void M();
+                    }
+                    """)
+            ],
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
             codeActionIndex: 0,
             makeDiagnosticsRequest: true);
     }
@@ -71,7 +111,7 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
             codeActionIndex: 0,
             makeDiagnosticsRequest: true);
     }
@@ -107,7 +147,7 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
             codeActionIndex: 0,
             fileKind: RazorFileKind.Legacy,
             makeDiagnosticsRequest: true);
@@ -142,7 +182,7 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
             codeActionIndex: 0,
             fileKind: RazorFileKind.Legacy,
             makeDiagnosticsRequest: true);
@@ -173,7 +213,7 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
             codeActionIndex: 0,
             fileKind: RazorFileKind.Legacy,
             makeDiagnosticsRequest: true);
@@ -208,7 +248,7 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
             codeActionIndex: 1,
             makeDiagnosticsRequest: true);
     }
@@ -284,7 +324,7 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
             codeActionIndex: 1,
             makeDiagnosticsRequest: true);
     }
@@ -324,9 +364,6 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     int IBase.this[int index] { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
                     string IBase.Property1 { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-                    string IDerived.Property1 { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-
-                    int IDerived.this[int index] { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
                     event EventHandler IBase.Event1
                     {
@@ -340,6 +377,10 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                             throw new NotImplementedException();
                         }
                     }
+
+                    int IDerived.this[int index] { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+
+                    string IDerived.Property1 { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
                     event EventHandler IDerived.Event1
                     {
@@ -375,7 +416,7 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
             codeActionIndex: 1,
             makeDiagnosticsRequest: true);
     }
@@ -419,7 +460,7 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                 }
                 """,
-            codeActionName: RazorPredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
             codeActionIndex: 1,
             makeDiagnosticsRequest: true);
     }
@@ -461,7 +502,7 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
             codeActionIndex: 0,
             makeDiagnosticsRequest: true);
     }
@@ -498,7 +539,7 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
             codeActionIndex: 0,
             makeDiagnosticsRequest: true);
     }
@@ -544,7 +585,7 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
             codeActionIndex: 0,
             makeDiagnosticsRequest: true);
     }
@@ -586,7 +627,7 @@ public class ImplementInterfaceTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.ImplementInterface,
+            codeActionName: PredefinedCodeFixProviderNames.ImplementInterface,
             codeActionIndex: 0,
             makeDiagnosticsRequest: true);
     }

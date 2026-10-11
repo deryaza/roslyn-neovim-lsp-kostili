@@ -709,6 +709,27 @@ namespace Microsoft.CodeAnalysis.CSharp
             return ObjectNotEqual(Convert(objectType, value, c), Null(objectType));
         }
 
+        public BoundExpression IsNullReference(BoundExpression value)
+        {
+            var objectType = SpecialType(Microsoft.CodeAnalysis.SpecialType.System_Object);
+
+            Conversion c;
+            if (value.Type is TypeParameterSymbol { AllowsRefLikeType: true })
+            {
+                c = Conversion.Boxing;
+            }
+            else
+            {
+                var useSiteInfo = CompoundUseSiteInfo<AssemblySymbol>.Discarded;
+                c = Compilation.Conversions.ClassifyConversionFromExpression(value, objectType, isChecked: false, ref useSiteInfo);
+            }
+
+            Debug.Assert(c.IsImplicit);
+            Debug.Assert(c.IsBoxing || c.IsReference || c.IsIdentity);
+
+            return ObjectEqual(Convert(objectType, value, c), Null(objectType));
+        }
+
         public BoundBinaryOperator ObjectNotEqual(BoundExpression left, BoundExpression right)
         {
             return Binary(BinaryOperatorKind.ObjectNotEqual, SpecialType(Microsoft.CodeAnalysis.SpecialType.System_Boolean), left, right);
@@ -1437,7 +1458,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             // in special circumstances. These circumstances are exactly the checks performed by
             // MayUseCallForStructMethod (which is also used by the emitter when determining
             // whether or not to call a method with a value type receiver directly).
-            if (!method.ContainingType.IsValueType || !Microsoft.CodeAnalysis.CSharp.CodeGen.CodeGenerator.MayUseCallForStructMethod(method))
+            if (!method.ContainingType.IsValueType || !Microsoft.CodeAnalysis.CSharp.CodeGen.CodeGenerator.MayUseCallForStructMethod(this.CompilationState.Compilation.SourceModule, method))
             {
                 method = method.GetConstructedLeastOverriddenMethod(this.CompilationState.Type, requireSameReturnType: true);
             }

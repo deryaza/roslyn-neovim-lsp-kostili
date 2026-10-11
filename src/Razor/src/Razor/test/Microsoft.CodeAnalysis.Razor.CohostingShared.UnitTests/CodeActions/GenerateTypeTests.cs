@@ -3,7 +3,7 @@
 
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Razor.Language;
-using Microsoft.CodeAnalysis.ExternalAccess.Razor;
+using Microsoft.CodeAnalysis.CodeFixes;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -39,9 +39,48 @@ public class GenerateTypeTests(ITestOutputHelper testOutputHelper) : CohostCodeA
                     }
                 }
                 """,
-            codeActionName: RazorPredefinedCodeFixProviderNames.GenerateType,
+            codeActionName: PredefinedCodeFixProviderNames.GenerateType,
             codeActionIndex: 1,
             makeDiagnosticsRequest: true);
+
+    [Fact]
+    public Task GenerateType_FromCodeBlock_ExistingCodeBlock_UsesEditorConfig()
+        => VerifyCodeActionAsync(
+            input: """
+                @code
+                {
+                    private object M()
+                    {
+                        return new [||]MissingType();
+                    }
+                }
+                """,
+            expected: """
+                @code
+                {
+                    private object M()
+                    {
+                        return new MissingType();
+                    }
+
+                    private class MissingType {
+                        public MissingType() {
+                        }
+                    }
+                }
+                """,
+            codeActionName: PredefinedCodeFixProviderNames.GenerateType,
+            codeActionIndex: 1,
+            makeDiagnosticsRequest: true,
+            additionalFiles:
+            [
+                (".editorconfig", """
+                    root = true
+
+                    [*.razor]
+                    csharp_new_line_before_open_brace = none
+                    """)
+            ]);
 
     [Fact]
     public Task GenerateType_FromCodeBlock_ExistingCodeBlock_Struct()
@@ -68,7 +107,7 @@ public class GenerateTypeTests(ITestOutputHelper testOutputHelper) : CohostCodeA
                     }
                 }
                 """,
-            codeActionName: RazorPredefinedCodeFixProviderNames.GenerateType,
+            codeActionName: PredefinedCodeFixProviderNames.GenerateType,
             codeActionIndex: 1,
             makeDiagnosticsRequest: true);
 
@@ -95,7 +134,7 @@ public class GenerateTypeTests(ITestOutputHelper testOutputHelper) : CohostCodeA
                     }
                 }
                 """,
-            codeActionName: RazorPredefinedCodeFixProviderNames.GenerateType,
+            codeActionName: PredefinedCodeFixProviderNames.GenerateType,
             codeActionIndex: 1,
             makeDiagnosticsRequest: true);
 
@@ -132,7 +171,7 @@ public class GenerateTypeTests(ITestOutputHelper testOutputHelper) : CohostCodeA
                         }
                     }
                     """)],
-            codeActionName: RazorPredefinedCodeFixProviderNames.GenerateType,
+            codeActionName: PredefinedCodeFixProviderNames.GenerateType,
             codeActionIndex: 0,
             makeDiagnosticsRequest: true);
 
@@ -181,7 +220,7 @@ public class GenerateTypeTests(ITestOutputHelper testOutputHelper) : CohostCodeA
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.GenerateType,
+            codeActionName: PredefinedCodeFixProviderNames.GenerateType,
             makeDiagnosticsRequest: true);
 
     [Fact]
@@ -205,7 +244,7 @@ public class GenerateTypeTests(ITestOutputHelper testOutputHelper) : CohostCodeA
                     }
                 }
                 """,
-            codeActionName: RazorPredefinedCodeFixProviderNames.GenerateType,
+            codeActionName: PredefinedCodeFixProviderNames.GenerateType,
             codeActionIndex: 1,
             makeDiagnosticsRequest: true);
 
@@ -234,7 +273,7 @@ public class GenerateTypeTests(ITestOutputHelper testOutputHelper) : CohostCodeA
                     }
                 }
                 """,
-            codeActionName: RazorPredefinedCodeFixProviderNames.GenerateType,
+            codeActionName: PredefinedCodeFixProviderNames.GenerateType,
             codeActionIndex: 1,
             makeDiagnosticsRequest: true);
     }
@@ -260,7 +299,7 @@ public class GenerateTypeTests(ITestOutputHelper testOutputHelper) : CohostCodeA
                     }
                 }
                 """,
-            codeActionName: RazorPredefinedCodeFixProviderNames.GenerateType,
+            codeActionName: PredefinedCodeFixProviderNames.GenerateType,
             codeActionIndex: 1,
             fileKind: RazorFileKind.Legacy,
             makeDiagnosticsRequest: true);

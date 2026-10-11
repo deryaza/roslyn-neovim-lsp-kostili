@@ -3,8 +3,9 @@
 
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Razor.Language;
-using Microsoft.CodeAnalysis.ExternalAccess.Razor;
+using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.Razor.Settings;
+using Roslyn.Test.Utilities;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -41,7 +42,97 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod);
+    }
+
+    [Fact]
+    [WorkItem("https://github.com/dotnet/razor/issues/5607")]
+    public async Task GenerateMethod_UsesEditorConfig_Razor()
+    {
+        var input = """
+            @code
+            {
+                private void M()
+                {
+                    [||]NewMethod();
+                }
+            }
+            """;
+
+        var expected = """
+            @using System
+            @code
+            {
+                private void M()
+                {
+                NewMethod();
+                }
+
+                private void NewMethod()
+                {
+                throw new NotImplementedException();
+                }
+            }
+            """;
+
+        await VerifyCodeActionAsync(
+            input,
+            expected,
+            PredefinedCodeFixProviderNames.GenerateMethod,
+            additionalFiles:
+            [
+                (".editorconfig", """
+                    root = true
+
+                    [*.razor]
+                    csharp_indent_block_contents = false
+                    """)
+            ]);
+    }
+
+    [Fact]
+    [WorkItem("https://github.com/dotnet/razor/issues/5607")]
+    public async Task GenerateMethod_UsesEditorConfig_Cshtml()
+    {
+        var input = """
+            @functions
+            {
+                private void M()
+                {
+                    [||]NewMethod();
+                }
+            }
+            """;
+
+        var expected = """
+            @functions
+            {
+                private void M()
+                {
+                NewMethod();
+                }
+
+                private void NewMethod()
+                {
+                throw new NotImplementedException();
+                }
+            }
+            """;
+
+        await VerifyCodeActionAsync(
+            input,
+            expected,
+            PredefinedCodeFixProviderNames.GenerateMethod,
+            fileKind: RazorFileKind.Legacy,
+            additionalFiles:
+            [
+                (".editorconfig", """
+                    root = true
+
+                    [*.cshtml]
+                    csharp_indent_block_contents = false
+                    """)
+            ]);
     }
 
     [Fact]
@@ -75,7 +166,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -103,7 +194,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -131,7 +222,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -161,7 +252,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -182,7 +273,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -206,7 +297,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -229,7 +320,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -256,7 +347,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -285,7 +376,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -309,7 +400,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -343,7 +434,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -368,10 +459,10 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
                 }
             }
 
-            @code {}
+            @code { }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -422,7 +513,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.GenerateMethod);
+            codeActionName: PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -477,7 +568,47 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.GenerateMethod);
+            codeActionName: PredefinedCodeFixProviderNames.GenerateMethod);
+    }
+
+    [Fact]
+    public async Task GenerateMethod_FromRazor_InSameRazorFile_UsesEditorConfig()
+    {
+        await VerifyCodeActionAsync(
+            input: """
+                @code
+                {
+                    private void M()
+                    {
+                        [||]NewMethod();
+                    }
+                }
+                """,
+            expected: """
+                @using System
+                @code
+                {
+                    private void M()
+                    {
+                        NewMethod();
+                    }
+
+                    private void NewMethod ()
+                    {
+                        throw new NotImplementedException();
+                    }
+                }
+                """,
+            additionalFiles:
+            [
+                (".editorconfig", """
+                    root = true
+
+                    [*.razor]
+                    csharp_space_between_method_declaration_name_and_open_parenthesis = true
+                    """)
+            ],
+            codeActionName: PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -521,7 +652,60 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.GenerateMethod);
+            codeActionName: PredefinedCodeFixProviderNames.GenerateMethod);
+    }
+
+    [Fact]
+    public async Task GenerateMethod_FromRazor_InOtherRazorFile_UsesEditorConfig()
+    {
+        await VerifyCodeActionAsync(
+            input: """
+                @code {
+                    private void M()
+                    {
+                        var x= new OtherComponent();
+                        x.[||]NewMethod();
+                    }
+                }
+                """,
+            expected: """
+                @code {
+                    private void M()
+                    {
+                        var x= new OtherComponent();
+                        x.NewMethod();
+                    }
+                }
+                """,
+            additionalFiles:
+            [
+                (FilePath("OtherComponent.razor"), """
+                    <div>Hi</div>
+                    """),
+                (".editorconfig", """
+                    root = true
+
+                    [File1.razor]
+                    csharp_space_between_method_declaration_name_and_open_parenthesis = false
+
+                    [OtherComponent.razor]
+                    csharp_space_between_method_declaration_name_and_open_parenthesis = true
+                    """)
+            ],
+            additionalExpectedFiles:
+            [
+                (FileUri("OtherComponent.razor"), """
+                    @using System
+                    <div>Hi</div>
+                    @code {
+                        internal void NewMethod ()
+                        {
+                            throw new NotImplementedException();
+                        }
+                    }
+                    """)
+            ],
+            codeActionName: PredefinedCodeFixProviderNames.GenerateMethod);
     }
 
     [Fact]
@@ -548,7 +732,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod, fileKind: RazorFileKind.Legacy);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod, fileKind: RazorFileKind.Legacy);
     }
 
     [Fact]
@@ -572,7 +756,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod, fileKind: RazorFileKind.Legacy);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod, fileKind: RazorFileKind.Legacy);
     }
 
     [Fact]
@@ -603,7 +787,7 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod, fileKind: RazorFileKind.Legacy);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod, fileKind: RazorFileKind.Legacy);
     }
 
     [Fact]
@@ -630,6 +814,6 @@ public class GenerateMethodTests(ITestOutputHelper testOutputHelper) : CohostCod
             @functions { }
             """;
 
-        await VerifyCodeActionAsync(input, expected, RazorPredefinedCodeFixProviderNames.GenerateMethod, fileKind: RazorFileKind.Legacy);
+        await VerifyCodeActionAsync(input, expected, PredefinedCodeFixProviderNames.GenerateMethod, fileKind: RazorFileKind.Legacy);
     }
 }

@@ -1,8 +1,8 @@
-// Licensed to the .NET Foundation under one or more agreements.
+﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.ExternalAccess.Razor;
+using Microsoft.CodeAnalysis.CodeFixes;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -42,8 +42,53 @@ public class GenerateConversionTests(ITestOutputHelper testOutputHelper) : Cohos
         await VerifyCodeActionAsync(
             input,
             expected,
-            RazorPredefinedCodeFixProviderNames.GenerateConversion,
+            PredefinedCodeFixProviderNames.GenerateConversion,
             makeDiagnosticsRequest: true);
+    }
+
+    [Fact]
+    public async Task GenerateExplicitConversion_FromCodeBlock_ExistingCodeBlock_UsesEditorConfig()
+    {
+        var input = """
+            @code
+            {
+                private int M()
+                {
+                    return [||](int)this;
+                }
+            }
+            """;
+
+        var expected = """
+            @using System
+            @code
+            {
+                private int M()
+                {
+                    return (int)this;
+                }
+
+                public static explicit operator int (File1 v)
+                {
+                    throw new NotImplementedException();
+                }
+            }
+            """;
+
+        await VerifyCodeActionAsync(
+            input,
+            expected,
+            PredefinedCodeFixProviderNames.GenerateConversion,
+            makeDiagnosticsRequest: true,
+            additionalFiles:
+            [
+                (".editorconfig", """
+                    root = true
+
+                    [*.razor]
+                    csharp_space_between_method_declaration_name_and_open_parenthesis = true
+                    """)
+            ]);
     }
 
     [Fact]
@@ -67,7 +112,7 @@ public class GenerateConversionTests(ITestOutputHelper testOutputHelper) : Cohos
         await VerifyCodeActionAsync(
             input,
             expected,
-            RazorPredefinedCodeFixProviderNames.GenerateConversion,
+            PredefinedCodeFixProviderNames.GenerateConversion,
             makeDiagnosticsRequest: true);
     }
 
@@ -119,7 +164,7 @@ public class GenerateConversionTests(ITestOutputHelper testOutputHelper) : Cohos
                     }
                     """)
             ],
-            codeActionName: RazorPredefinedCodeFixProviderNames.GenerateConversion,
+            codeActionName: PredefinedCodeFixProviderNames.GenerateConversion,
             makeDiagnosticsRequest: true);
     }
 }

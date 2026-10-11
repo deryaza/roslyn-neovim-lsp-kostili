@@ -615,9 +615,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
 
         public override bool IsStatic => HasFlag(MethodAttributes.Static);
 
-        internal override bool IsMetadataVirtual(IsMetadataVirtualOption option = IsMetadataVirtualOption.None) => HasFlag(MethodAttributes.Virtual);
+        internal override bool IsMetadataVirtual(ModuleSymbol context, bool ignoreInterfaceImplementationChanges = false) => IsMetadataVirtual();
+        internal bool IsMetadataVirtual() => HasFlag(MethodAttributes.Virtual);
 
-        internal override bool IsMetadataNewSlot(bool ignoreInterfaceImplementationChanges = false) => HasFlag(MethodAttributes.NewSlot);
+        internal override bool IsMetadataNewSlot(ModuleSymbol context, bool ignoreInterfaceImplementationChanges = false) => IsMetadataNewSlot();
+        internal bool IsMetadataNewSlot() => HasFlag(MethodAttributes.NewSlot);
 
         internal override bool IsMetadataFinal => HasFlag(MethodAttributes.Final);
 
@@ -1542,14 +1544,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
                         "11");
                 }
 
-                if (diagnosticInfo == null &&
-                    _containingType.ContainingPEModule.MemorySafetyRulesVersion == PEModuleSymbol.MemorySafetyRulesAttributeVersion.UnrecognizedAttribute)
-                {
-                    diagnosticInfo = new CSDiagnosticInfo(ErrorCode.ERR_UnrecognizedAttributeVersion,
-                        this,
-                        WellKnownTypes.GetMetadataName(WellKnownType.System_Runtime_CompilerServices_MemorySafetyRulesAttribute),
-                        CSharpCompilationOptions.UpdatedMemorySafetyRulesVersion.ToString(CultureInfo.InvariantCulture));
-                }
+                diagnosticInfo ??= PEUtilities.DeriveUnrecognizedMemorySafetyRulesAttributeDiagnostic(this);
 
                 if (diagnosticInfo == null && GetUnmanagedCallersOnlyAttributeData(forceComplete: true) is UnmanagedCallersOnlyAttributeData data)
                 {
@@ -1825,28 +1820,25 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Metadata.PE
         {
             if (ContainingModule.UseUpdatedMemorySafetyRules)
             {
-                Debug.Assert(AssociatedSymbol?.CallerUnsafeMode != CallerUnsafeMode.Implicit);
+                Debug.Assert(AssociatedSymbol?.GetRequiresUnsafeMode(ConsList<FieldSymbol>.Empty) != RequiresUnsafeMode.Implicit);
 
-                return hasRequiresUnsafeAttribute || AssociatedSymbol?.CallerUnsafeMode == CallerUnsafeMode.Explicit;
+                return hasRequiresUnsafeAttribute || AssociatedSymbol?.GetRequiresUnsafeMode(ConsList<FieldSymbol>.Empty) == RequiresUnsafeMode.Explicit;
             }
 
             // This might be expensive, so we cache it in _packedFlags.
             return this.HasParameterContainingPointerType() || ReturnType.ContainsPointerOrFunctionPointer();
         }
 
-        internal sealed override CallerUnsafeMode CallerUnsafeMode
+        internal sealed override RequiresUnsafeMode GetRequiresUnsafeMode(ConsList<FieldSymbol> fieldsBeingBound)
         {
-            get
+            if (!RequiresUnsafe)
             {
-                if (!RequiresUnsafe)
-                {
-                    return CallerUnsafeMode.None;
-                }
-
-                return ContainingModule.UseUpdatedMemorySafetyRules
-                    ? CallerUnsafeMode.Explicit
-                    : CallerUnsafeMode.Implicit;
+                return RequiresUnsafeMode.None;
             }
+
+            return ContainingModule.UseUpdatedMemorySafetyRules
+                ? RequiresUnsafeMode.Explicit
+                : RequiresUnsafeMode.Implicit;
         }
 
         internal override bool HasAsyncMethodBuilderAttribute(out TypeSymbol builderArgument)
